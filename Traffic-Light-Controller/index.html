@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4-Way Traffic Light Controller — FSM Simulation</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Application Header -->
+  <header class="app-header">
+    <div class="header-title">
+      <h1>
+        <span style="display:inline-block; width:12px; height:12px; background:#10b981; border-radius:50%; box-shadow:0 0 8px #10b981;"></span>
+        Traffic Light Controller
+      </h1>
+      <p class="tagline">Finite State Machine (FSM) 4-Way Junction Controller & Safety Verifier</p>
+    </div>
+    <div class="header-badges">
+      <div id="badgeStatus" class="badge badge-status stopped">STATE: STOPPED</div>
+      <div id="badgeInvariant" class="badge badge-invariant">INVARIANT: CONFLICT-FREE</div>
+    </div>
+  </header>
+
+  <!-- Controls Bar -->
+  <section class="control-bar" aria-label="Simulation Controls">
+    <div class="control-group">
+      <button id="btnStart" class="btn btn-primary" title="Start / Resume FSM Simulation">
+        <span aria-hidden="true">&#9658;</span> Start
+      </button>
+      <button id="btnPause" class="btn btn-warning" title="Pause Simulation" disabled>
+        <span aria-hidden="true">&#10074;&#10074;</span> Pause
+      </button>
+      <button id="btnReset" class="btn btn-secondary" title="Reset to Initial State S0">
+        <span aria-hidden="true">&#8635;</span> Reset
+      </button>
+      <button id="btnStep" class="btn btn-secondary" title="Manually step to next FSM state">
+        <span aria-hidden="true">&#8677;</span> Manual Step
+      </button>
+    </div>
+
+    <div class="control-group">
+      <div class="speed-selector">
+        <label for="speedSelect">Speed Multiplier:</label>
+        <select id="speedSelect">
+          <option value="1" selected>1x (Real-time)</option>
+          <option value="2">2x (Accelerated)</option>
+          <option value="5">5x (Rapid)</option>
+        </select>
+      </div>
+      <button id="btnRunVerification" class="btn btn-verify" title="Execute automated verification suite in-browser">
+        <span aria-hidden="true">&#10003;</span> Run Invariant Tests
+      </button>
+    </div>
+  </section>
+
+  <!-- Main Content Grid -->
+  <main class="dashboard-grid">
+    <!-- Left: 4-Way Traffic Junction Visualization -->
+    <section class="panel" aria-label="Traffic Junction View">
+      <div class="panel-header">
+        <h2>
+          <span>&#9680;</span> 4-Way Traffic Junction
+        </h2>
+        <span id="activeAxisLabel" class="state-axis">Active Axis: North-South</span>
+      </div>
+
+      <div class="junction-container">
+        <div class="intersection">
+          <!-- North-South Road -->
+          <div class="road-ns"></div>
+          <!-- East-West Road -->
+          <div class="road-ew"></div>
+
+          <!-- Central Box -->
+          <div class="intersection-center">
+            <div class="junction-grid-box">
+              <div class="center-marker"></div>
+            </div>
+          </div>
+
+          <!-- Road Markings: Dividers -->
+          <div class="divider-ns-north"></div>
+          <div class="divider-ns-south"></div>
+          <div class="divider-ew-west"></div>
+          <div class="divider-ew-east"></div>
+
+          <!-- Stop Lines -->
+          <div class="stop-line-north" title="North approach stop line"></div>
+          <div class="stop-line-south" title="South approach stop line"></div>
+          <div class="stop-line-west" title="West approach stop line"></div>
+          <div class="stop-line-east" title="East approach stop line"></div>
+
+          <!-- Crosswalks -->
+          <div class="crosswalk crosswalk-north"></div>
+          <div class="crosswalk crosswalk-south"></div>
+          <div class="crosswalk crosswalk-west"></div>
+          <div class="crosswalk crosswalk-east"></div>
+
+          <!-- Flow Status Overlays -->
+          <div id="flowNS" class="flow-indicator flow-ns flow-active">NS Flowing</div>
+          <div id="flowEW" class="flow-indicator flow-ew flow-stopped">EW Stopped</div>
+
+          <!-- Traffic Signal Units -->
+          <!-- NORTH SIGNAL -->
+          <div id="signalNorth" class="signal-unit signal-north">
+            <div class="signal-header">
+              <span class="signal-direction-label">NORTH</span>
+              <span id="timerNorth" class="signal-countdown">10</span>
+            </div>
+            <div class="signal-housing">
+              <div id="lampNorthRed" class="lamp lamp-red"></div>
+              <div id="lampNorthYellow" class="lamp lamp-yellow"></div>
+              <div id="lampNorthGreen" class="lamp lamp-green active"></div>
+            </div>
+          </div>
+
+          <!-- SOUTH SIGNAL -->
+          <div id="signalSouth" class="signal-unit signal-south">
+            <div class="signal-header">
+              <span class="signal-direction-label">SOUTH</span>
+              <span id="timerSouth" class="signal-countdown">10</span>
+            </div>
+            <div class="signal-housing">
+              <div id="lampSouthRed" class="lamp lamp-red"></div>
+              <div id="lampSouthYellow" class="lamp lamp-yellow"></div>
+              <div id="lampSouthGreen" class="lamp lamp-green active"></div>
+            </div>
+          </div>
+
+          <!-- WEST SIGNAL -->
+          <div id="signalWest" class="signal-unit signal-west">
+            <div class="signal-header">
+              <span class="signal-direction-label">WEST</span>
+              <span id="timerWest" class="signal-countdown">10</span>
+            </div>
+            <div class="signal-housing">
+              <div id="lampWestRed" class="lamp lamp-red active"></div>
+              <div id="lampWestYellow" class="lamp lamp-yellow"></div>
+              <div id="lampWestGreen" class="lamp lamp-green"></div>
+            </div>
+          </div>
+
+          <!-- EAST SIGNAL -->
+          <div id="signalEast" class="signal-unit signal-east">
+            <div class="signal-header">
+              <span class="signal-direction-label">EAST</span>
+              <span id="timerEast" class="signal-countdown">10</span>
+            </div>
+            <div class="signal-housing">
+              <div id="lampEastRed" class="lamp lamp-red active"></div>
+              <div id="lampEastYellow" class="lamp lamp-yellow"></div>
+              <div id="lampEastGreen" class="lamp lamp-green"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: FSM Telemetry, State Inspector & Safety Verification -->
+    <div class="dashboard-side">
+      <!-- Active State Card -->
+      <section class="active-state-card" aria-label="Current State Telemetry">
+        <div class="state-meta-row">
+          <div id="stateTitle" class="state-title">S0: NS Green / EW Red</div>
+          <div id="stateIdBadge" class="state-axis">State 0 of 3</div>
+        </div>
+        <p id="stateDesc" class="state-description">
+          North and South corridors flow. East and West corridors hold at red.
+        </p>
+        <div class="countdown-progress-container">
+          <div class="progress-header">
+            <span>State Countdown: <strong id="countdownSeconds">10s</strong></span>
+            <span>Elapsed in Phase: <span id="elapsedSeconds">0s</span></span>
+          </div>
+          <div class="progress-bar-bg">
+            <div id="progressBarFill" class="progress-bar-fill" style="width: 100%;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Safety Invariant Monitor -->
+      <section id="safetyCard" class="invariant-card" aria-label="Safety Invariant Proof">
+        <div class="invariant-header">
+          <span class="invariant-title">&#9670; SAFETY INVARIANT PROOF</span>
+          <span id="safetyStatusLabel" style="font-weight:700; font-size:0.75rem;">ALL CHECKS PASSED</span>
+        </div>
+        <div class="invariant-body">
+          <div>&bull; Invariant: Conflicting axes NEVER green concurrently.</div>
+          <div id="safetyEquation" style="color:#a7f3d0;">
+            Condition: (NS == GREEN) &#8743; (EW == GREEN) &#8801; FALSE
+          </div>
+          <div class="invariant-metric" id="safetyMetrics">
+            Verified transitions: 0 | Violations: 0 | Clearance lock: OK
+          </div>
+        </div>
+      </section>
+
+      <!-- FSM 4-State Cycle Table -->
+      <section class="panel" style="padding:1rem;" aria-label="FSM State Transition Matrix">
+        <div class="panel-header" style="margin-bottom:0.5rem;">
+          <h2><span>&#9776;</span> FSM State Matrix</h2>
+          <span style="font-size:0.75rem; color:var(--text-dim); font-family:var(--font-mono);">Cyclic: S0 &rarr; S1 &rarr; S2 &rarr; S3 &rarr; S0</span>
+        </div>
+        <div class="state-table-container">
+          <table class="state-table">
+            <thead>
+              <tr>
+                <th>State</th>
+                <th>NS Light</th>
+                <th>EW Light</th>
+                <th>Duration (s)</th>
+                <th>Next State</th>
+              </tr>
+            </thead>
+            <tbody id="stateTableBody">
+              <!-- Rendered via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Automated Invariant Test Drawer -->
+      <section class="verification-drawer" aria-label="Verification Results">
+        <div class="verification-header">
+          <strong style="font-size:0.85rem; color:#fff;">Automated Verification Proofs</strong>
+          <span id="testSummaryBadge" class="badge" style="background:#1e3a8a; color:#93c5fd; padding:2px 8px; font-size:0.7rem;">Ready</span>
+        </div>
+        <div id="verificationList" class="verification-list">
+          <div style="color:var(--text-dim); font-style:italic;">Click "Run Invariant Tests" to execute the full verification suite.</div>
+        </div>
+      </section>
+
+      <!-- Live Event Log -->
+      <section class="panel" style="padding:0.85rem;" aria-label="Transition Event Log">
+        <div class="panel-header" style="margin-bottom:0.4rem; padding-bottom:0.3rem;">
+          <h2 style="font-size:0.9rem;"><span>&#9881;</span> State Transition Log</h2>
+          <button id="btnClearLog" style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:0.7rem;">Clear</button>
+        </div>
+        <div id="eventLog" class="event-log">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Application Footer -->
+  <footer class="app-footer">
+    Traffic Light Controller &bull; Vanilla HTML/CSS/JS &bull; Finite State Machine Architecture &bull; Invariant Safety Verified
+  </footer>
+
+  <!-- Scripts -->
+  <script src="fsm.js"></script>
+  <script src="verify.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
