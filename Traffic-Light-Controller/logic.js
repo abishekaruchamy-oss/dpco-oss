@@ -19,11 +19,11 @@
 
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory();
+    module.exports = factory(require('./fsm.js'), require('./vehicles.js'));
   } else {
-    root.LogicEngine = factory();
+    root.LogicEngine = factory(root.TrafficFSM, root.VehicleManager);
   }
-})(typeof self !== 'undefined' ? self : this, function () {
+})(typeof self !== 'undefined' ? self : this, function (TrafficLightFSM, VehicleManager) {
   'use strict';
 
   // -------------------------------------------------------------
@@ -256,7 +256,7 @@
       booleanEquation: 'PriorityHold = ActiveEmergency ∧ TargetGreenActive ∧ ¬VehicleCleared',
       latexEquation: '\\text{PriorityHold} = \\text{Emergency} \\cdot \\text{GreenActive} \\cdot \\overline{\\text{VehicleCleared}}',
       gatesUsed: ['NOT', 'AND (3-Input)'],
-      description: 'Freezes the FSM cycle timer and extends green authorization when an approaching emergency vehicle (ambulance/fire truck) has achieved green clearance and has not yet traversed past the intersection exit line.',
+      description: 'Freezes the FSM cycle timer and extends green authorization when an approaching emergency vehicle (Ambulance, Fire Engine, or Police Cruiser) has achieved green clearance and has not yet traversed past the intersection exit line.',
       hardwareAnalogy: 'Preemption hold latch with automatic acoustic/optical sensor reset on exit line detector trigger.',
       inputs: [
         { id: 'activeEmergency', label: 'Emergency Vehicle Present', desc: 'Emergency vehicle active in queue' },
@@ -359,15 +359,18 @@
   function evaluateVehicleEntryCircuit(inputs) {
     const signalGreen = inputs.signalGreen ? 1 : 0;
     const conflictingOccupied = inputs.conflictingOccupied ? 1 : 0;
+    const entryDir = inputs.entryDir || 'north';
     const notConflicting = evaluateGate(GATES.NOT, conflictingOccupied);
     const output = evaluateGate(GATES.AND, signalGreen, notConflicting);
 
     return {
       output,
+      entryDir,
       subTerms: {
         signalGreen,
         conflictingOccupied,
-        notConflicting
+        notConflicting,
+        entryDir
       }
     };
   }
@@ -446,7 +449,18 @@
 
     const state = fsm.getCurrentState ? fsm.getCurrentState() : 'S0_NS_GREEN';
     const signals = fsm.getSignals ? fsm.getSignals() : { north: 'GREEN', south: 'GREEN', east: 'RED', west: 'RED' };
-    const safety = fsm.validateSafety ? fsm.validateSafety(signals) : { isSafe: true };
+
+    // Strictly read-only invariant safety evaluation without mutating internal FSM state
+    let safety = { isSafe: true, code: 'SAFE' };
+    const FsmClass = TrafficLightFSM || (typeof root !== 'undefined' ? root.TrafficFSM : null) || (fsm ? fsm.constructor : null);
+    if (FsmClass && typeof FsmClass.checkSignalsSafety === 'function') {
+      safety = FsmClass.checkSignalsSafety(signals);
+    } else if (fsm && typeof fsm.validateSafety === 'function') {
+      safety = fsm.validateSafety(signals, false);
+    } else if (fsm && fsm.lastSafetyCheck) {
+      safety = fsm.lastSafetyCheck;
+    }
+
     const isAllRed = fsm.isAllRedHalt ? fsm.isAllRedHalt() : false;
 
     // FSM State Bits
@@ -471,6 +485,7 @@
     let ewConflictOccupied = 0;
     let activeEmergency = 0;
     let emergencyDirection = null;
+    let emergencyVehicleType = null;
     let emergencyCleared = 0;
 
     if (vehicleManager) {
@@ -479,25 +494,76 @@
         nsConflictOccupied = vehicleManager.isConflictingAxisInIntersection('north') ? 1 : 0;
         ewConflictOccupied = vehicleManager.isConflictingAxisInIntersection('east') ? 1 : 0;
       }
+    }
 
-      // Check emergency vehicle status
-      if (vehicleManager.lanes) {
-        const dirs = ['north', 'south', 'east', 'west'];
-        for (let d = 0; d < dirs.length; d++) {
-          const lane = vehicleManager.lanes[dirs[d]];
-          if (lane) {
-            for (let v = 0; v < lane.length; v++) {
-              if (lane[v].type === 'ambulance' || lane[v].type === 'firetruck') {
-                activeEmergency = 1;
-                emergencyDirection = dirs[d];
-                emergencyCleared = lane[v].hasClearedStopLine ? 1 : 0;
-                break;
-              }
+    // Authoritative Emergency Vehicle Detection & Multi-Class Identification
+    // 1. Prefer active FSM emergency preemption request if registered
+    const fsmPriority = (fsm && typeof fsm.getEmergencyPriority === 'function')
+      ? fsm.getEmergencyPriority()
+      : (fsm && fsm.emergencyPriority ? fsm.emergencyPriority : null);
+
+    const hasFsmActivePriority = !!(fsmPriority && fsmPriority.active);
+    if (hasFsmActivePriority) {
+      activeEmergency = 1;
+      emergencyDirection = fsmPriority.direction;
+    }
+
+    // 2. Scan VehicleManager for active emergency vehicles across lanes
+    const EMERGENCY_CLASSES = ['AMBULANCE', 'FIRE_ENGINE', 'POLICE'];
+    let matchedVehicle = null;
+
+    if (vehicleManager && vehicleManager.lanes) {
+      const dirs = ['north', 'south', 'east', 'west'];
+      // Prioritize searching the active FSM requested corridor first
+      const searchDirs = emergencyDirection
+        ? [emergencyDirection, ...dirs.filter(d => d !== emergencyDirection)]
+        : dirs;
+
+      for (let d = 0; d < searchDirs.length; d++) {
+        const dir = searchDirs[d];
+        const lane = vehicleManager.lanes[dir] || [];
+
+        for (let v = 0; v < lane.length; v++) {
+          const veh = lane[v];
+          // Authoritative check: must be explicitly an emergency vehicle class
+          const isEmerg = veh.isEmergency === true || (veh.type && EMERGENCY_CLASSES.includes(veh.type.toUpperCase()));
+          if (isEmerg) {
+            if (!activeEmergency) {
+              activeEmergency = 1;
+              emergencyDirection = dir;
+            }
+            if (dir === emergencyDirection && !matchedVehicle) {
+              matchedVehicle = veh;
+              emergencyVehicleType = veh.type;
+              break;
             }
           }
-          if (activeEmergency) break;
         }
+        if (matchedVehicle) break;
       }
+
+      if (matchedVehicle) {
+        // Vehicle is still approaching or traversing:
+        // Clearance is strictly determined by hasClearedIntersection (pos >= JUNCTION_EXIT),
+        // NEVER prematurely released by hasClearedStopLine!
+        emergencyCleared = matchedVehicle.hasClearedIntersection ? 1 : 0;
+      } else if (hasFsmActivePriority) {
+        // Active FSM request exists, but vehicle may have just cleared or despawned
+        if (vehicleManager.emergencyEvents && vehicleManager.emergencyEvents.length > 0) {
+          const ev = vehicleManager.emergencyEvents.find(e => e.direction === emergencyDirection);
+          if (ev && ev.cleared) {
+            emergencyCleared = 1;
+          } else {
+            emergencyCleared = 0;
+          }
+        } else {
+          emergencyCleared = 0;
+        }
+      } else {
+        emergencyCleared = 0;
+      }
+    } else if (hasFsmActivePriority) {
+      emergencyCleared = 0;
     }
 
     const isEmergencyNorthSouth = emergencyDirection === 'north' || emergencyDirection === 'south';
@@ -505,10 +571,19 @@
       ? ((isEmergencyNorthSouth && isS0) || (!isEmergencyNorthSouth && isS2) ? 1 : 0)
       : 0;
 
-    // Choose active corridor for Vehicle Entry demonstration based on which direction has green
-    const entryDir = isS2 ? 'east' : 'north';
-    const entrySignalGreen = isS2 ? ewGreen : nsGreen;
-    const entryConflictingOccupied = isS2 ? ewConflictOccupied : nsConflictOccupied;
+    // Choose active corridor for Vehicle Entry demonstration:
+    // If East-West has green (S2) or yellow (S3), evaluate East approach.
+    // If North-South has green (S0) or yellow (S1), evaluate North approach.
+    // In All-Red or stopped states, default to North approach.
+    let entryDir = 'north';
+    if (isS2 || isS3 || signals.east === 'GREEN' || signals.east === 'YELLOW') {
+      entryDir = 'east';
+    } else {
+      entryDir = 'north';
+    }
+
+    const entrySignalGreen = (entryDir === 'east') ? ewGreen : nsGreen;
+    const entryConflictingOccupied = (entryDir === 'east') ? ewConflictOccupied : nsConflictOccupied;
 
     // Evaluate all 6 circuits with authentic live data
     const evalNSGreen = evaluateNSGreenCircuit({
@@ -530,7 +605,8 @@
 
     const evalVehicleEntry = evaluateVehicleEntryCircuit({
       signalGreen: entrySignalGreen,
-      conflictingOccupied: entryConflictingOccupied
+      conflictingOccupied: entryConflictingOccupied,
+      entryDir
     });
 
     const evalEmergencyHold = evaluateEmergencyHoldCircuit({
@@ -893,12 +969,16 @@
       }
 
       case CONTROLLER_CIRCUITS.VEHICLE_ENTRY: {
-        const signalGreen = sub.signalGreen;
-        const conflictingOccupied = sub.conflictingOccupied;
-        const notConflicting = sub.notConflicting;
+        const signalGreen = sub.signalGreen !== undefined ? sub.signalGreen : (data.signalGreen ? 1 : 0);
+        const conflictingOccupied = sub.conflictingOccupied !== undefined ? sub.conflictingOccupied : (data.conflictingOccupied ? 1 : 0);
+        const notConflicting = sub.notConflicting !== undefined ? sub.notConflicting : (conflictingOccupied ? 0 : 1);
+        const activeDir = (sub.entryDir || data.entryDir || 'north').toUpperCase();
 
         return `
           <svg class="circuit-schematic-svg" viewBox="0 0 320 120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Vehicle Entry Circuit">
+            <!-- Active Corridor Indicator -->
+            <text x="8" y="16" class="circ-pin-text" style="font-weight:700; fill:#38bdf8;">Approach: ${activeDir}</text>
+
             <!-- Inputs -->
             <text x="8" y="38" class="circ-pin-text">Signal GREEN: <tspan fill="${signalGreen ? '#4ade80' : '#64748b'}">${signalGreen}</tspan></text>
             <text x="8" y="88" class="circ-pin-text">Conflict Blocked: <tspan fill="${conflictingOccupied ? '#f87171' : '#64748b'}">${conflictingOccupied}</tspan></text>

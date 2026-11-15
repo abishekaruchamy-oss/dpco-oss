@@ -121,15 +121,20 @@
     }
 
     /**
-     * Check safety invariants:
-     * 1. North/South GREEN or YELLOW cannot coincide with East/West GREEN or YELLOW.
-     * 2. Conflicting directions never receive green simultaneously.
-     * @param {Object} [signals] Optional signals to test; defaults to current state.
-     * @returns {Object} { isSafe: boolean, reason: string }
+     * Pure, non-mutating safety invariant check on a signals object.
+     * Evaluates safety rules without altering any internal FSM state.
+     * @param {Object} signals { north, south, east, west }
+     * @returns {Object} { isSafe: boolean, code: string, reason: string }
      */
-    validateSafety(signals = null) {
-      const currentSignals = signals || this.getSignals();
-      const { north, south, east, west } = currentSignals;
+    static checkSignalsSafety(signals) {
+      if (!signals) {
+        return {
+          isSafe: true,
+          code: 'SAFE',
+          reason: 'Invariant verified: Default safe configuration.'
+        };
+      }
+      const { north, south, east, west } = signals;
 
       const nsGreen = north === LIGHTS.GREEN || south === LIGHTS.GREEN;
       const ewGreen = east === LIGHTS.GREEN || west === LIGHTS.GREEN;
@@ -138,33 +143,52 @@
 
       // Primary requirement: Conflicting directions never receive green simultaneously
       if (nsGreen && ewGreen) {
-        const failure = {
+        return {
           isSafe: false,
           code: 'ERR_DUAL_GREEN',
           reason: 'CRITICAL HAZARD: North-South and East-West directions have GREEN simultaneously!'
         };
-        this.lastSafetyCheck = failure;
-        return failure;
       }
 
       // Secondary clearance invariant: An active direction cannot overlap with another active direction
       if (nsActive && ewActive) {
-        const failure = {
+        return {
           isSafe: false,
           code: 'ERR_DUAL_ACTIVE',
           reason: 'CRITICAL HAZARD: Both corridors have active clearance (Green/Yellow) concurrently!'
         };
-        this.lastSafetyCheck = failure;
-        return failure;
       }
 
-      const pass = {
+      return {
         isSafe: true,
         code: 'SAFE',
         reason: 'Invariant verified: Conflicting directions are strictly isolated.'
       };
-      this.lastSafetyCheck = pass;
-      return pass;
+    }
+
+    /**
+     * Check safety invariants:
+     * 1. North/South GREEN or YELLOW cannot coincide with East/West GREEN or YELLOW.
+     * 2. Conflicting directions never receive green simultaneously.
+     * @param {Object} [signals] Optional signals to test; defaults to current state.
+     * @param {boolean} [updateLastCheck=true] Whether to update this.lastSafetyCheck.
+     * @returns {Object} { isSafe: boolean, code: string, reason: string }
+     */
+    validateSafety(signals = null, updateLastCheck = true) {
+      const currentSignals = signals || this.getSignals();
+      const res = TrafficLightFSM.checkSignalsSafety(currentSignals);
+      if (updateLastCheck) {
+        this.lastSafetyCheck = res;
+      }
+      return res;
+    }
+
+    /**
+     * Get the last recorded safety check result without mutating state
+     * @returns {Object|null}
+     */
+    getLastSafetyCheck() {
+      return this.lastSafetyCheck;
     }
 
     /**

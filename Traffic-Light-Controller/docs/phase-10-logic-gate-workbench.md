@@ -355,6 +355,18 @@ Summary: 81/81 assertions passed (0 failed).
 
 ---
 
-## 9. Conclusion & Demonstration Readiness
+## 9. Phase 10.1 Telemetry Accuracy & Integration Refinement
 
-Phase 10 successfully bridges theoretical Digital Principles and Computer Organization (DPCO) concepts with real-world Intelligent Transportation Systems (ITS) engineering. By grounding every logic gate diagram in authoritative application state, students and evaluators can directly observe how fundamental Boolean gates govern traffic light sequencing, conflict prevention, vehicle entry authorization, and emergency vehicle safety interlocks.
+Following an independent architectural review, Phase 10.1 resolved four key telemetry and clearance defects:
+1. Multi-class emergency detection (`AMBULANCE`, `FIRE_ENGINE`, `POLICE`) and exclusion of standard vehicles (`CAR`, `BUS`).
+2. Corrected premature clearance release at the stop line ($138\text{px}$) to hold through the entire conflict box until junction exit ($\ge 294\text{px}$).
+3. Grounded Vehicle Entry subterm pills and schematic labels in evaluated state, displaying dynamic approach corridors (`Approach: NORTH` / `EAST`).
+4. Converted safety validation to pure static evaluations (`TrafficLightFSM.checkSignalsSafety`), eliminating side-effects on FSM properties.
+
+All 15 regression tests (Tests 64–78) pass, bringing the full suite to **96/96 assertions passing (0 failures)**. See the complete [Phase 10.1 Correction Report](phase-10-1-correction-report.md) for diffs and visual evidence.
+
+---
+
+## 10. Conclusion & Demonstration Readiness
+
+Phase 10 and 10.1 successfully bridge theoretical Digital Principles and Computer Organization (DPCO) concepts with real-world Intelligent Transportation Systems (ITS) engineering. By grounding every logic gate diagram in authoritative application state, students and evaluators can directly observe how fundamental Boolean gates govern traffic light sequencing, conflict prevention, vehicle entry authorization, and emergency vehicle safety interlocks.

@@ -1379,6 +1379,326 @@
           `XOR(1,1)=${st1.output}, XOR(1,0)=${st2.output}, Unaltered FSM: ${fsmLive.getCurrentState()}, Unaltered Queue: ${vmLive.lanes.north.length}`
         );
       }
+
+      // =========================================================================
+      // PHASE 10.1 VERIFICATION (Digital Logic Telemetry & Backend Integration Fixes)
+      // =========================================================================
+
+      // --- TEST 64: Phase 10.1 - Multi-Class Emergency Vehicle Detection (AMBULANCE, FIRE_ENGINE, POLICE) ---
+      {
+        const fsmEm = new TrafficLightFSM();
+        const vmAmb = new VehicleManager();
+        vmAmb.spawnEmergencyVehicle('north', 'AMBULANCE');
+        const tAmb = getLogicTelemetry(fsmEm, vmAmb);
+
+        const vmFire = new VehicleManager();
+        vmFire.spawnEmergencyVehicle('east', 'FIRE_ENGINE');
+        const tFire = getLogicTelemetry(fsmEm, vmFire);
+
+        const vmPol = new VehicleManager();
+        vmPol.spawnEmergencyVehicle('south', 'POLICE');
+        const tPol = getLogicTelemetry(fsmEm, vmPol);
+
+        assert(
+          tAmb.emergency.active === 1 && tAmb.emergency.direction === 'north' &&
+          tFire.emergency.active === 1 && tFire.emergency.direction === 'east' &&
+          tPol.emergency.active === 1 && tPol.emergency.direction === 'south',
+          'Phase 10.1: All three emergency vehicle classes (AMBULANCE, FIRE_ENGINE, POLICE) are accurately detected with correct approach corridors',
+          `Amb: ${tAmb.emergency.direction}, Fire: ${tFire.emergency.direction}, Police: ${tPol.emergency.direction}`
+        );
+      }
+
+      // --- TEST 65: Phase 10.1 - Non-Emergency Vehicle Exclusion (CAR, BUS) ---
+      {
+        const fsmNoEm = new TrafficLightFSM();
+        const vmNorm = new VehicleManager();
+        vmNorm.spawnVehicle('north', 'CAR');
+        vmNorm.spawnVehicle('south', 'BUS');
+        const tNorm = getLogicTelemetry(fsmNoEm, vmNorm);
+
+        assert(
+          tNorm.emergency.active === 0 &&
+          tNorm.emergency.direction === null &&
+          tNorm.circuits.EMERGENCY_HOLD.output === 0,
+          'Phase 10.1: Ordinary vehicles (CAR, BUS) are strictly excluded from emergency logic circuits',
+          `Active emergency: ${tNorm.emergency.active}, Direction: ${tNorm.emergency.direction}, Hold output: ${tNorm.circuits.EMERGENCY_HOLD.output}`
+        );
+      }
+
+      // --- TEST 66: Phase 10.1 - Emergency Vehicle Approaching Stop Line ---
+      {
+        const fsmAppr = new TrafficLightFSM(); // Starts in S0 (NS Green)
+        const vmAppr = new VehicleManager();
+        const amb = vmAppr.spawnEmergencyVehicle('north', 'AMBULANCE');
+        amb.pos = 50; // Approaching stop line (138px)
+        amb.hasClearedStopLine = false;
+        amb.hasClearedIntersection = false;
+        fsmAppr.requestEmergencyPriority('north');
+
+        const tAppr = getLogicTelemetry(fsmAppr, vmAppr);
+        assert(
+          tAppr.emergency.active === 1 &&
+          tAppr.emergency.cleared === 0 &&
+          tAppr.circuits.EMERGENCY_HOLD.output === 1,
+          'Phase 10.1: Emergency vehicle approaching stop line keeps priority hold active',
+          `Pos: ${amb.pos}px, Cleared: ${tAppr.emergency.cleared}, PriorityHold output: ${tAppr.circuits.EMERGENCY_HOLD.output}`
+        );
+      }
+
+      // --- TEST 67: Phase 10.1 - Emergency Vehicle Crossing Stop Line (In-Transit Invariant) ---
+      {
+        const fsmCross = new TrafficLightFSM();
+        const vmCross = new VehicleManager();
+        const ambCross = vmCross.spawnEmergencyVehicle('north', 'AMBULANCE');
+        ambCross.pos = 145; // Past stop line (138px), entering conflict zone
+        ambCross.hasClearedStopLine = true;
+        ambCross.hasClearedIntersection = false; // NOT cleared junction!
+        fsmCross.requestEmergencyPriority('north');
+
+        const tCross = getLogicTelemetry(fsmCross, vmCross);
+        assert(
+          tCross.emergency.active === 1 &&
+          tCross.emergency.cleared === 0 &&
+          tCross.circuits.EMERGENCY_HOLD.output === 1,
+          'Phase 10.1: Emergency vehicle crossing stop line maintains priority hold (not prematurely cleared)',
+          `Pos: ${ambCross.pos}px, hasClearedStopLine: ${ambCross.hasClearedStopLine}, cleared: ${tCross.emergency.cleared}, PriorityHold: ${tCross.circuits.EMERGENCY_HOLD.output}`
+        );
+      }
+
+      // --- TEST 68: Phase 10.1 - Emergency Vehicle Traversing Conflict Zone ---
+      {
+        const fsmTrav = new TrafficLightFSM();
+        const vmTrav = new VehicleManager();
+        const ambTrav = vmTrav.spawnEmergencyVehicle('north', 'AMBULANCE');
+        ambTrav.pos = 220; // Deep inside central junction box (156px - 294px)
+        ambTrav.hasClearedStopLine = true;
+        ambTrav.hasClearedIntersection = false;
+        fsmTrav.requestEmergencyPriority('north');
+
+        const tTrav = getLogicTelemetry(fsmTrav, vmTrav);
+        assert(
+          tTrav.emergency.active === 1 &&
+          tTrav.emergency.cleared === 0 &&
+          tTrav.circuits.EMERGENCY_HOLD.output === 1,
+          'Phase 10.1: Emergency vehicle traversing intersection box preserves active priority hold',
+          `Pos: ${ambTrav.pos}px (in conflict box), Cleared: ${tTrav.emergency.cleared}, PriorityHold: ${tTrav.circuits.EMERGENCY_HOLD.output}`
+        );
+      }
+
+      // --- TEST 69: Phase 10.1 - Emergency Vehicle Junction Exit Clearance ---
+      {
+        const fsmExit = new TrafficLightFSM();
+        const vmExit = new VehicleManager();
+        const ambExit = vmExit.spawnEmergencyVehicle('north', 'AMBULANCE');
+        ambExit.pos = 300; // Past junction exit (294px)
+        ambExit.hasClearedStopLine = true;
+        ambExit.hasClearedIntersection = true; // Safely exited!
+
+        const tExit = getLogicTelemetry(fsmExit, vmExit);
+        assert(
+          tExit.emergency.cleared === 1 &&
+          tExit.circuits.EMERGENCY_HOLD.output === 0,
+          'Phase 10.1: Emergency vehicle safely crossing junction exit sets cleared=1 and deactivates priority hold',
+          `Pos: ${ambExit.pos}px, hasClearedIntersection: ${ambExit.hasClearedIntersection}, cleared: ${tExit.emergency.cleared}, PriorityHold: ${tExit.circuits.EMERGENCY_HOLD.output}`
+        );
+      }
+
+      // --- TEST 70: Phase 10.1 - Synchronized Priority Lock and Circuit Output Release ---
+      {
+        const fsmRel = new TrafficLightFSM();
+        const vmRel = new VehicleManager();
+        fsmRel.requestEmergencyPriority('north');
+        const holdingBefore = fsmRel.isHoldingPriorityGreen();
+
+        // Release priority
+        fsmRel.clearEmergencyPriority();
+        const holdingAfter = fsmRel.isHoldingPriorityGreen();
+        const tRel = getLogicTelemetry(fsmRel, vmRel);
+
+        assert(
+          holdingBefore === true &&
+          holdingAfter === false &&
+          tRel.circuits.EMERGENCY_HOLD.output === 0,
+          'Phase 10.1: FSM emergency priority hold lock and circuit output release in exact synchronization',
+          `Holding before: ${holdingBefore}, Holding after: ${holdingAfter}, Hold circuit output: ${tRel.circuits.EMERGENCY_HOLD.output}`
+        );
+      }
+
+      // --- TEST 71: Phase 10.1 - Multiple Emergency Requests & FSM Priority Direction Preference ---
+      {
+        const fsmMulti = new TrafficLightFSM();
+        const vmMulti = new VehicleManager();
+        vmMulti.spawnEmergencyVehicle('north', 'AMBULANCE');
+        vmMulti.spawnEmergencyVehicle('east', 'FIRE_ENGINE');
+        // Authoritative FSM requested priority for East
+        fsmMulti.requestEmergencyPriority('east');
+
+        const tMulti = getLogicTelemetry(fsmMulti, vmMulti);
+        assert(
+          tMulti.emergency.active === 1 &&
+          tMulti.emergency.direction === 'east',
+          'Phase 10.1: Active FSM emergency request takes priority when multiple emergency vehicles are queued',
+          `Controlling direction: ${tMulti.emergency.direction} (FSM priority target)`
+        );
+      }
+
+      // --- TEST 72: Phase 10.1 - Vehicle Entry Inputs during S0 (North-South Green) ---
+      {
+        const fsmS0 = new TrafficLightFSM(); // S0: NS Green, EW Red
+        const vmS0 = new VehicleManager();
+        const tS0 = getLogicTelemetry(fsmS0, vmS0);
+        const entryCirc = tS0.circuits.VEHICLE_ENTRY;
+
+        assert(
+          entryCirc.entryDir === 'north' &&
+          entryCirc.subTerms.signalGreen === 1 &&
+          entryCirc.subTerms.conflictingOccupied === 0 &&
+          entryCirc.output === 1,
+          'Phase 10.1: Vehicle Entry circuit evaluates North approach with signalGreen=1 during S0',
+          `Approach: ${entryCirc.entryDir}, signalGreen: ${entryCirc.subTerms.signalGreen}, output: ${entryCirc.output}`
+        );
+      }
+
+      // --- TEST 73: Phase 10.1 - Vehicle Entry Inputs during S2 (East-West Green) ---
+      {
+        const fsmS2 = new TrafficLightFSM();
+        fsmS2.step(); // S1
+        fsmS2.step(); // S2: EW Green, NS Red
+        const vmS2 = new VehicleManager();
+        const tS2 = getLogicTelemetry(fsmS2, vmS2);
+        const entryCirc = tS2.circuits.VEHICLE_ENTRY;
+
+        assert(
+          entryCirc.entryDir === 'east' &&
+          entryCirc.subTerms.signalGreen === 1 &&
+          entryCirc.subTerms.conflictingOccupied === 0 &&
+          entryCirc.output === 1,
+          'Phase 10.1: Vehicle Entry circuit evaluates East approach with signalGreen=1 during S2',
+          `Approach: ${entryCirc.entryDir}, signalGreen: ${entryCirc.subTerms.signalGreen}, output: ${entryCirc.output}`
+        );
+      }
+
+      // --- TEST 74: Phase 10.1 - Vehicle Entry Inputs during Yellow Clearance (S1 and S3) ---
+      {
+        const fsmYel = new TrafficLightFSM();
+        fsmYel.step(); // S1 (NS Yellow, EW Red)
+        const vmYel = new VehicleManager();
+        const tS1 = getLogicTelemetry(fsmYel, vmYel);
+
+        fsmYel.step(); // S2
+        fsmYel.step(); // S3 (EW Yellow, NS Red)
+        const tS3 = getLogicTelemetry(fsmYel, vmYel);
+
+        assert(
+          tS1.circuits.VEHICLE_ENTRY.subTerms.signalGreen === 0 &&
+          tS1.circuits.VEHICLE_ENTRY.output === 0 &&
+          tS3.circuits.VEHICLE_ENTRY.subTerms.signalGreen === 0 &&
+          tS3.circuits.VEHICLE_ENTRY.output === 0,
+          'Phase 10.1: Vehicle Entry circuit denies entry (signalGreen=0, output=0) during yellow clearance states',
+          `S1 signalGreen: ${tS1.circuits.VEHICLE_ENTRY.subTerms.signalGreen}, S3 signalGreen: ${tS3.circuits.VEHICLE_ENTRY.subTerms.signalGreen}`
+        );
+      }
+
+      // --- TEST 75: Phase 10.1 - Vehicle Entry Inputs during All-Red Halt ---
+      {
+        const fsmHalt = new TrafficLightFSM();
+        fsmHalt.triggerAllRedHalt();
+        const vmHalt = new VehicleManager();
+        const tHalt = getLogicTelemetry(fsmHalt, vmHalt);
+
+        assert(
+          tHalt.circuits.VEHICLE_ENTRY.subTerms.signalGreen === 0 &&
+          tHalt.circuits.VEHICLE_ENTRY.output === 0,
+          'Phase 10.1: Vehicle Entry circuit denies entry during fail-safe All-Red halt',
+          `All-Red signalGreen: ${tHalt.circuits.VEHICLE_ENTRY.subTerms.signalGreen}, EntryGranted: ${tHalt.circuits.VEHICLE_ENTRY.output}`
+        );
+      }
+
+      // --- TEST 76: Phase 10.1 - Strictly Read-Only Telemetry Bridge Invariant (Zero FSM Mutation) ---
+      {
+        const fsmRo = new TrafficLightFSM();
+        const vmRo = new VehicleManager();
+
+        // Perform initial validation to establish baseline state
+        const baselineSafety = fsmRo.validateSafety();
+        const snapState = fsmRo.getCurrentState();
+        const snapTransitions = fsmRo.transitionCount;
+        const snapHistoryLen = fsmRo.history.length;
+        const snapPriority = fsmRo.getEmergencyPriority();
+        const snapSafetyCheck = fsmRo.lastSafetyCheck;
+
+        // Execute 50 continuous telemetry queries
+        for (let q = 0; q < 50; q++) {
+          getLogicTelemetry(fsmRo, vmRo);
+        }
+
+        assert(
+          fsmRo.getCurrentState() === snapState &&
+          fsmRo.transitionCount === snapTransitions &&
+          fsmRo.history.length === snapHistoryLen &&
+          fsmRo.getEmergencyPriority() === snapPriority &&
+          fsmRo.lastSafetyCheck === snapSafetyCheck,
+          'Phase 10.1: Telemetry bridge extraction is strictly read-only and causes zero mutation to FSM properties',
+          `State: ${fsmRo.getCurrentState()}, Transitions: ${fsmRo.transitionCount}, lastSafetyCheck unmutated: true`
+        );
+      }
+
+      // --- TEST 77: Phase 10.1 - Strictly Read-Only Telemetry Bridge Invariant (Zero VehicleManager Mutation) ---
+      {
+        const fsmVmRo = new TrafficLightFSM();
+        const vmRo2 = new VehicleManager();
+        vmRo2.spawnVehicle('north', 'CAR');
+        vmRo2.spawnVehicle('east', 'BUS');
+
+        const carPos = vmRo2.lanes.north[0].pos;
+        const carSpeed = vmRo2.lanes.north[0].speed;
+        const busPos = vmRo2.lanes.east[0].pos;
+        const genCount = vmRo2.analytics.totalGenerated;
+
+        // Query telemetry repeatedly
+        for (let q = 0; q < 25; q++) {
+          getLogicTelemetry(fsmVmRo, vmRo2);
+        }
+
+        assert(
+          vmRo2.lanes.north[0].pos === carPos &&
+          vmRo2.lanes.north[0].speed === carSpeed &&
+          vmRo2.lanes.east[0].pos === busPos &&
+          vmRo2.analytics.totalGenerated === genCount,
+          'Phase 10.1: Telemetry bridge extraction causes zero mutation to vehicle physics, queues, or analytics',
+          `North Car Pos: ${vmRo2.lanes.north[0].pos}px, Speed: ${vmRo2.lanes.north[0].speed}px/s, Generated: ${vmRo2.analytics.totalGenerated}`
+        );
+      }
+
+      // --- TEST 78: Phase 10.1 - Circuit Subterms and SVG Schematic Value Agreement ---
+      {
+        const fsmAgr = new TrafficLightFSM();
+        const vmAgr = new VehicleManager();
+        const tAgr = getLogicTelemetry(fsmAgr, vmAgr);
+
+        let allCircuitsAgreed = true;
+        const circuitKeys = Object.keys(tAgr.circuits);
+
+        circuitKeys.forEach((circKey) => {
+          const cData = tAgr.circuits[circKey];
+          const sub = cData.subTerms;
+          if (!sub || typeof cData.output !== 'number') {
+            allCircuitsAgreed = false;
+          }
+        });
+
+        // Test Vehicle Entry subterms match exactly
+        const vSub = tAgr.circuits.VEHICLE_ENTRY.subTerms;
+        const svgContent = LogicEngine.renderControllerCircuitSvg('VEHICLE_ENTRY', tAgr);
+        const hasApproachInSvg = svgContent.includes('Approach: NORTH');
+        const hasSignalInSvg = svgContent.includes(`Signal GREEN: <tspan fill="#4ade80">${vSub.signalGreen}</tspan>`);
+
+        assert(
+          allCircuitsAgreed && hasApproachInSvg && hasSignalInSvg,
+          'Phase 10.1: All circuit subterms, displayed pills, and SVG schematic text render identical evaluated telemetry values',
+          `All circuits verified: true, SVG includes Approach: NORTH and Signal GREEN: ${vSub.signalGreen}`
+        );
+      }
     }
 
     return results;

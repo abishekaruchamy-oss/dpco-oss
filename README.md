@@ -16,7 +16,7 @@ An advanced, browser-native **Intelligent Traffic Management System (ITMS)** bui
 - **Emergency Vehicle Priority Preemption**: High-priority dispatching for Ambulances, Fire Engines, and Police Cruisers with safe yellow clearance transitions, active green extension, and automatic priority release.
 - **Advanced ITS Analytics & Pure SVG Telemetry**: Real-time rolling queue sparklines rendered via pure SVG, 4-quadrant approach congestion heatmap, continuous Traffic Efficiency Scoring ($15\text{--}99\%$), and adaptive delay savings accounting.
 - **DPCO Digital Logic Gate Workbench**: Live and Learning Mode digital logic demonstration panel grounded in production controller state, standard 7-gate explorer (AND, OR, NOT, NAND, NOR, XOR, XNOR), 6 authentic Boolean controller circuits, dynamic truth tables, and animated signal flow wires.
-- **Formal Verification Suite**: 81 automated deterministic assertions covering all 10 phases and 18 operational scenarios, executable via Node.js CLI (`node verify.js`) or interactively inside the web browser with 100% pass rate.
+- **Formal Verification Suite**: 96 automated deterministic assertions covering all phases, DPCO circuits, emergency preemption holds, and operational scenarios, executable via Node.js CLI (`node verify.js`) or interactively inside the web browser with 100% pass rate.
 
 #### Technical Documentation
 - 📘 [Project Overview & Architecture](./Traffic-Light-Controller/docs/project-overview.md)
@@ -31,6 +31,7 @@ An advanced, browser-native **Intelligent Traffic Management System (ITMS)** bui
 - 🚀 [Phase 8 Complete Visual UI Audit & Remediation Report](./Traffic-Light-Controller/docs/phase-8-remediation-report.md)
 - 🏆 [Phase 9 Independent End-to-End Acceptance Report](./Traffic-Light-Controller/docs/phase-9-acceptance-report.md)
 - ⚡ [Phase 10 DPCO Digital Logic Gate Workbench Manual](./Traffic-Light-Controller/docs/phase-10-logic-gate-workbench.md)
+- 🔬 [Phase 10.1 Logic Telemetry Accuracy & Clearance Fix Report](./Traffic-Light-Controller/docs/phase-10-1-correction-report.md)
 
 #### Quick Start
 Open [`Traffic-Light-Controller/index.html`](./Traffic-Light-Controller/index.html) directly in any modern web browser.

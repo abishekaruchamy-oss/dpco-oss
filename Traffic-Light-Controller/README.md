@@ -21,7 +21,7 @@ Traffic-Light-Controller/
 ├── analytics.js      # Advanced ITS analytics engine, pure SVG sparklines & heatmap
 ├── logic.js          # Phase 10: DPCO Digital logic engine, 7-gate library & controller circuits
 ├── app.js            # Application controller: DOM bindings, countdown loop & 60fps render
-├── verify.js         # Automated verification suite (81 formal assertions, CLI and in-browser)
+├── verify.js         # Automated verification suite (96 formal assertions, CLI and in-browser)
 ├── README.md         # Architecture, FSM documentation, and verification proofs
 └── docs/             # Comprehensive documentation suite
     ├── project-overview.md        # Architectural overview, dataflow & design principles
@@ -38,7 +38,9 @@ Traffic-Light-Controller/
     ├── phase-9-acceptance-report.md # Phase 9 independent end-to-end acceptance testing report
     ├── phase-9-evidence/          # Phase 9 browser acceptance screenshot evidence (17 images)
     ├── phase-10-logic-gate-workbench.md # Phase 10 DPCO logic gate workbench manual & truth tables
-    └── phase-10-evidence/         # Phase 10 headless browser screenshot evidence (8 images)
+    ├── phase-10-evidence/         # Phase 10 headless browser screenshot evidence (8 images)
+    ├── phase-10-1-correction-report.md # Phase 10.1 Telemetry accuracy, clearance & read-only bridge report
+    └── phase-10.1-evidence/       # Phase 10.1 headless browser screenshot evidence (10 images)
 ```
 
 ---
@@ -61,6 +63,7 @@ For exhaustive technical references, inspect the dedicated documentation manuals
 | **Phase 8 Remediation** | [`docs/phase-8-remediation-report.md`](./docs/phase-8-remediation-report.md) | Balanced dashboard architecture, authoritative demand snapshot, crosswalk geometry, and 10 screenshot proofs. |
 | **Phase 9 Acceptance Report** | [`docs/phase-9-acceptance-report.md`](./docs/phase-9-acceptance-report.md) | Independent end-to-end browser acceptance report across Scenarios A-H, 17 screenshot captures, and demonstration readiness. |
 | **Phase 10 Logic Workbench** | [`docs/phase-10-logic-gate-workbench.md`](./docs/phase-10-logic-gate-workbench.md) | DPCO Digital Logic Gate Workbench, truth tables, 6 production circuits, learning sandbox, and 8 screenshot proofs. |
+| **Phase 10.1 Telemetry Fix** | [`docs/phase-10-1-correction-report.md`](./docs/phase-10-1-correction-report.md) | Telemetry accuracy fix: multi-class emergency detection, conflict zone clearance, vehicle entry alignment, and 10 screenshot proofs. |
 
 ---
 
@@ -335,6 +338,22 @@ node Traffic-Light-Controller/verify.js
   - **Test 61**: Circuit 6 (Invariant Defense Monitor): $\text{Hazard} = (NS_{Green} \lor NS_{Yellow}) \land (EW_{Green} \lor EW_{Yellow})$.
   - **Test 62**: Authoritative telemetry bridge extracts accurate live state and synchronizes circuit evaluations.
   - **Test 63**: Learning Mode state changes are completely sandboxed and produce zero side-effects on traffic simulation.
+- **Phase 10.1 (Digital Logic Telemetry Accuracy & Emergency Priority Refinement)**:
+  - **Test 64**: Multi-class emergency detection across `AMBULANCE`, `FIRE_ENGINE`, and `POLICE`.
+  - **Test 65**: Strict exclusion of non-emergency passenger vehicles (`CAR`, `BUS`).
+  - **Test 66**: Priority hold active while emergency vehicle approaches stop line ($50\text{px}$).
+  - **Test 67**: In-transit priority hold maintained past stop line ($145\text{px}$) without premature clearance.
+  - **Test 68**: Priority hold preserved while vehicle actively traverses intersection conflict zone ($220\text{px}$).
+  - **Test 69**: Safe clearance release strictly upon crossing intersection exit ($300\text{px}$, $\text{cleared}=1$).
+  - **Test 70**: Synchronized release of FSM priority hold lock and logic circuit output.
+  - **Test 71**: Active FSM preemption request prioritized during multi-vehicle queue congestion.
+  - **Test 72**: Vehicle Entry circuit evaluates North approach with `signalGreen=1` during $S_0$.
+  - **Test 73**: Vehicle Entry circuit evaluates East approach with `signalGreen=1` during $S_2$.
+  - **Test 74**: Vehicle Entry circuit denies permission during yellow clearance states ($S_1, S_3$).
+  - **Test 75**: Vehicle Entry circuit denies permission during fail-safe All-Red halt.
+  - **Test 76**: Telemetry bridge extraction is strictly read-only with zero mutation to FSM state properties.
+  - **Test 77**: Telemetry bridge extraction causes zero mutation to vehicle physics, speeds, or queues.
+  - **Test 78**: Full concordance between circuit subterm pills, SVG schematics, and evaluated logic gates.
 
 ---
 

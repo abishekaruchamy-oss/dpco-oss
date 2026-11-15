@@ -471,7 +471,8 @@
       manualStep,
       toggleAllRedHalt,
       handleAllRedHalt: toggleAllRedHalt,
-      handleEmergencyCleared
+      handleEmergencyCleared,
+      updateLogicWorkbenchUI: (force = true) => updateLogicWorkbenchUI(force)
     };
   }
 
@@ -897,22 +898,44 @@
       );
     }
 
-    // Render Subterm Pills
+    // Render Subterm Pills directly from the evaluated circuit snapshot
     if (elements.liveCircuitInputsList) {
       elements.liveCircuitInputsList.innerHTML = '';
+      const sub = circuitData.subTerms || {};
+
+      // If Vehicle Entry circuit, show active approach corridor indicator first
+      if (currentLiveCircuit === 'VEHICLE_ENTRY') {
+        const approachPill = document.createElement('span');
+        const dirName = (circuitData.entryDir || sub.entryDir || 'north').toUpperCase();
+        approachPill.className = 'subterm-pill active';
+        approachPill.innerHTML = `<span>Approach:</span> <strong>${dirName}</strong>`;
+        elements.liveCircuitInputsList.appendChild(approachPill);
+      }
+
       circMeta.inputs.forEach((inp) => {
         let val = 0;
-        if (inp.id === 's0') val = telemetry.stateBits.isS0;
-        else if (inp.id === 's2') val = telemetry.stateBits.isS2;
-        else if (inp.id === 'allRed' || inp.id === 'emergencyAllRed') val = telemetry.stateBits.isAllRed;
-        else if (inp.id === 'fault' || inp.id === 'invariantViolation') val = telemetry.safety.violation;
-        else if (inp.id === 'signalGreen') val = (currentLiveCircuit === 'EW_GREEN' ? telemetry.signalBits.ewGreen : telemetry.signalBits.nsGreen);
-        else if (inp.id === 'conflictingOccupied') val = (currentLiveCircuit === 'EW_GREEN' ? telemetry.conflictOccupancy.ew : telemetry.conflictOccupancy.ns);
-        else if (inp.id === 'activeEmergency') val = telemetry.emergency.active;
-        else if (inp.id === 'targetGreenActive') val = telemetry.emergency.targetGreenActive;
-        else if (inp.id === 'vehicleCleared') val = telemetry.emergency.cleared;
-        else if (inp.id === 'nsActive') val = (telemetry.signalBits.nsGreen || telemetry.signalBits.nsYellow) ? 1 : 0;
-        else if (inp.id === 'ewActive') val = (telemetry.signalBits.ewGreen || telemetry.signalBits.ewYellow) ? 1 : 0;
+        // Prioritize exact evaluated value from circuit subterms
+        if (sub[inp.id] !== undefined) {
+          val = sub[inp.id];
+        } else if (inp.id === 's0') {
+          val = telemetry.stateBits.isS0;
+        } else if (inp.id === 's2') {
+          val = telemetry.stateBits.isS2;
+        } else if (inp.id === 'allRed' || inp.id === 'emergencyAllRed') {
+          val = telemetry.stateBits.isAllRed;
+        } else if (inp.id === 'fault' || inp.id === 'invariantViolation') {
+          val = telemetry.safety.violation;
+        } else if (inp.id === 'activeEmergency') {
+          val = telemetry.emergency.active;
+        } else if (inp.id === 'targetGreenActive') {
+          val = telemetry.emergency.targetGreenActive;
+        } else if (inp.id === 'vehicleCleared') {
+          val = telemetry.emergency.cleared;
+        } else if (inp.id === 'nsActive') {
+          val = (sub.nsActive !== undefined) ? sub.nsActive : ((telemetry.signalBits.nsGreen || telemetry.signalBits.nsYellow) ? 1 : 0);
+        } else if (inp.id === 'ewActive') {
+          val = (sub.ewActive !== undefined) ? sub.ewActive : ((telemetry.signalBits.ewGreen || telemetry.signalBits.ewYellow) ? 1 : 0);
+        }
 
         const pill = document.createElement('span');
         pill.className = `subterm-pill ${val ? 'active' : ''}`;
