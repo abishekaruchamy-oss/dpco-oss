@@ -15,7 +15,7 @@ An advanced, browser-native **Intelligent Traffic Management System (ITMS)** bui
 - **Adaptive Intelligent Signal Timing**: Dynamic corridor demand sensing ($D_{NS}, D_{EW}$), queue-responsive green interval scaling ($5\text{s} \le T \le 25\text{s}$), anti-starvation fair throughput guarantees, and Explainable AI (XAI) decision rationales.
 - **Emergency Vehicle Priority Preemption**: High-priority dispatching for Ambulances, Fire Engines, and Police Cruisers with safe yellow clearance transitions, active green extension, and automatic priority release.
 - **Advanced ITS Analytics & Pure SVG Telemetry**: Real-time rolling queue sparklines rendered via pure SVG, 4-quadrant approach congestion heatmap, continuous Traffic Efficiency Scoring ($15\text{--}99\%$), and adaptive delay savings accounting.
-- **Formal Verification Suite**: 50 automated deterministic assertions executable via Node.js CLI (`node verify.js`) or interactively inside the web browser with 100% pass rate.
+- **Formal Verification Suite**: 68 automated deterministic assertions covering all 7 phases and 18 operational scenarios, executable via Node.js CLI (`node verify.js`) or interactively inside the web browser with 100% pass rate.
 
 #### Technical Documentation
 - 📘 [Project Overview & Architecture](./Traffic-Light-Controller/docs/project-overview.md)
@@ -24,6 +24,8 @@ An advanced, browser-native **Intelligent Traffic Management System (ITMS)** bui
 - 🧪 [Verification & Testing Audit (50/50 Assertions)](./Traffic-Light-Controller/docs/testing-report.md)
 - 📖 [User & Operator Manual](./Traffic-Light-Controller/docs/user-guide.md)
 - 🛡️ [Final Independent Audit & QA Report](./Traffic-Light-Controller/docs/final-audit-report.md)
+- 🔍 [Phase 7 Defect Investigation & Root Cause Report](./Traffic-Light-Controller/docs/phase-7-investigation.md)
+- 🛠️ [Phase 7 Simulation Reliability & Remediation Report](./Traffic-Light-Controller/docs/phase-7-remediation-report.md)
 
 #### Quick Start
 Open [`Traffic-Light-Controller/index.html`](./Traffic-Light-Controller/index.html) directly in any modern web browser.

@@ -27,6 +27,8 @@
   let verifiedTransitionCount = 0;
   let violationCount = 0;
   let lastAnimTime = performance.now();
+  let wasRunningBeforeHalt = false;
+  let lastChartUpdate = 0;
 
   // DOM Elements cache
   const elements = {
@@ -165,8 +167,8 @@
       elements.emergencyBanner.style.display = 'flex';
       elements.emergencyBannerText.textContent = `${typeName} from ${direction.toUpperCase()}`;
       elements.emergencyBannerPhase.textContent = decision.status === 'ACTIVE_GREEN_EXTENDED'
-        ? 'Green Extended (Holding Priority)'
-        : 'Securing Clearance...';
+        ? 'Priority Green Active (Holding for Transit)'
+        : 'Securing Yellow Clearance...';
     }
 
     logEvent(`🚨 EMERGENCY PREEMPTION: ${typeName} dispatched on ${direction.toUpperCase()} approach. Decision: ${decision.status}`);
@@ -177,7 +179,7 @@
         remainingSeconds = 3;
       }
     } else if (decision.action === 'HOLD') {
-      remainingSeconds = Math.max(remainingSeconds, 15);
+      remainingSeconds = Math.max(remainingSeconds, 10);
     }
 
     updateUI();
@@ -326,8 +328,11 @@
       if (elements.statDelaySaved) {
         elements.statDelaySaved.textContent = `${analyticsEngine.cumulativeAdaptiveDelaySaved.toFixed(1)}s`;
       }
-      if (elements.chartQueueHistory) {
+      // Rate-limit SVG sparkline re-renders to 2Hz to prevent 60fps DOM thrashing
+      const nowMs = performance.now();
+      if (elements.chartQueueHistory && (nowMs - lastChartUpdate > 500)) {
         elements.chartQueueHistory.innerHTML = analyticsEngine.generateQueueHistorySvg(320, 60);
+        lastChartUpdate = nowMs;
       }
 
       // Update Approach Congestion Heatmap
@@ -580,6 +585,27 @@
       }
     }
 
+    // Dynamic Emergency Priority Banner State Synchronization
+    const priority = fsm.getEmergencyPriority();
+    if (priority && priority.active) {
+      if (elements.emergencyBanner) {
+        elements.emergencyBanner.style.display = 'flex';
+        const isNorthSouth = priority.direction === 'north' || priority.direction === 'south';
+        const targetState = isNorthSouth ? window.TrafficFSM.STATES.S0_NS_GREEN : window.TrafficFSM.STATES.S2_EW_GREEN;
+        if (fsm.isAllRedHalt()) {
+          elements.emergencyBannerPhase.textContent = 'All-Red Emergency Override';
+        } else if (fsm.getCurrentState() === targetState) {
+          elements.emergencyBannerPhase.textContent = 'Priority Green Active (Holding for Transit)';
+        } else {
+          elements.emergencyBannerPhase.textContent = 'Securing Yellow Clearance...';
+        }
+      }
+    } else {
+      if (elements.emergencyBanner) {
+        elements.emergencyBanner.style.display = 'none';
+      }
+    }
+
     // Status Badge
     updateStatusBadge();
   }
@@ -618,6 +644,15 @@
   function tick() {
     if (simStatus !== SIM_STATUS.RUNNING || fsm.isAllRedHalt()) return;
 
+    // If an emergency vehicle has secured priority green, hold green open until transit is complete
+    if (fsm.isHoldingPriorityGreen && fsm.isHoldingPriorityGreen()) {
+      if (remainingSeconds < 5) {
+        remainingSeconds = 5;
+      }
+      updateUI();
+      return;
+    }
+
     remainingSeconds--;
     elapsedSeconds++;
 
@@ -634,14 +669,14 @@
           if (adaptiveController.getMode() === 'ADAPTIVE') {
             fsm.setDuration(targetStateKey, decision.duration);
 
-            if (elements.adaptiveRationaleText) elements.adaptiveRationaleText.textContent = decision.rationale;
-            if (elements.adaptiveCalculatedDuration) elements.adaptiveCalculatedDuration.textContent = `${decision.duration}s (${decision.axis})`;
-
             const durationInput = document.querySelector(`.duration-input[data-state="${targetStateKey}"]`);
             if (durationInput) durationInput.value = decision.duration;
 
             logEvent(`Adaptive Control [${decision.axis}]: Green calculated at ${decision.duration}s. Reason: ${decision.rationale}`);
           }
+
+          if (elements.adaptiveRationaleText) elements.adaptiveRationaleText.textContent = decision.rationale;
+          if (elements.adaptiveCalculatedDuration) elements.adaptiveCalculatedDuration.textContent = `${decision.duration}s (${decision.axis})`;
         }
       }
 
@@ -659,7 +694,8 @@
    * Start or Resume Simulation
    */
   function startSimulation() {
-    if (simStatus === SIM_STATUS.RUNNING || fsm.isAllRedHalt()) return;
+    if (fsm.isAllRedHalt()) return;
+    if (simStatus === SIM_STATUS.RUNNING && timerInterval) return;
 
     simStatus = SIM_STATUS.RUNNING;
     updateStatusBadge();
@@ -698,6 +734,10 @@
     simStatus = SIM_STATUS.STOPPED;
     fsm.reset();
 
+    if (elements.emergencyBanner) {
+      elements.emergencyBanner.style.display = 'none';
+    }
+
     if (vehicleManager) {
       vehicleManager.reset();
       updateAnalyticsUI();
@@ -722,15 +762,20 @@
     if (fsm.isAllRedHalt()) {
       fsm.resumeFromAllRed();
       logEvent('Fail-Safe All-Red Halt released. Resuming normal operations.');
-      if (simStatus === SIM_STATUS.RUNNING) {
+      if (wasRunningBeforeHalt) {
+        simStatus = SIM_STATUS.STOPPED;
         startSimulation();
+      } else {
+        updateStatusBadge();
       }
     } else {
+      wasRunningBeforeHalt = (simStatus === SIM_STATUS.RUNNING);
       fsm.triggerAllRedHalt();
       if (timerInterval) {
         clearInterval(timerInterval);
         timerInterval = null;
       }
+      simStatus = SIM_STATUS.PAUSED;
       logEvent('EMERGENCY: Fail-Safe All-Red Halt activated! All vehicles stopping safely.');
     }
     updateUI();
@@ -823,6 +868,12 @@
         const mode = e.target.value;
         if (adaptiveController) {
           adaptiveController.setMode(mode);
+          const decision = adaptiveController.evaluatePhaseDuration(
+            fsm.getCurrentState(),
+            vehicleManager ? vehicleManager.getAnalytics().queueLengths : {}
+          );
+          if (elements.adaptiveRationaleText) elements.adaptiveRationaleText.textContent = decision.rationale;
+          if (elements.adaptiveCalculatedDuration) elements.adaptiveCalculatedDuration.textContent = `${decision.duration}s (${mode})`;
         }
         if (elements.adaptiveModeBadge) {
           elements.adaptiveModeBadge.textContent = `${mode} MODE`;

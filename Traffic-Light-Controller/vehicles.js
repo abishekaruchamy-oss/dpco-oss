@@ -257,6 +257,8 @@
       this.nextVehicleId = 1;
       this.totalSimulationTime = 0;
 
+      this.emergencyEvents = [];
+
       this.analytics = {
         totalGenerated: 0,
         totalPassed: 0,
@@ -264,7 +266,8 @@
         vehiclesWaitCount: 0,
         avgWaitTime: 0,
         queueLengths: { north: 0, south: 0, east: 0, west: 0 },
-        throughput: 0
+        throughput: 0,
+        emergencyCount: 0
       };
     }
 
@@ -363,8 +366,12 @@
         const lane = conflictingLanes[i];
         for (let j = 0; j < lane.length; j++) {
           const v = lane[j];
-          if (v.pos >= CONSTANTS.JUNCTION_ENTRY && v.pos <= CONSTANTS.JUNCTION_EXIT) {
-            return true; // Conflicting vehicle is inside the junction box
+          // A vehicle occupies the conflict zone from the moment its center enters the junction
+          // (pos >= JUNCTION_ENTRY) until its rear bumper completely clears the junction exit
+          const vLen = v.length || 26;
+          const rearPos = v.pos - vLen / 2;
+          if (v.pos >= CONSTANTS.JUNCTION_ENTRY && rearPos <= CONSTANTS.JUNCTION_EXIT) {
+            return true; // Conflicting vehicle is inside or clearing the junction box
           }
         }
       }
@@ -417,7 +424,7 @@
 
           if (isLead) {
             if (vehicle.hasClearedStopLine) {
-              // Once legitimately cleared, proceed through to clear intersection
+              // Once legitimately cleared stop line, proceed through to clear intersection
               allowedStopPos = CONSTANTS.DESPAWN_POS;
             } else {
               if (signalColor === 'RED' || signalColor === 'YELLOW') {
@@ -431,12 +438,17 @@
               }
             }
           } else {
-            // Following vehicle must strictly respect safe following distance behind leader
-            const leaderStopLimit = leader.pos - CONSTANTS.SAFE_FOLLOW_DIST;
-            allowedStopPos = Math.min(allowedStopPos, leaderStopLimit);
+            // Following vehicle must strictly respect safe following distance behind leader (length-dependent)
+            const safeFollowDist = (leader.length / 2 + vehicle.length / 2 + CONSTANTS.MIN_GAP);
+            const leaderStopLimit = leader.pos - safeFollowDist;
+            allowedStopPos = leaderStopLimit;
 
-            if (!vehicle.hasClearedStopLine && (signalColor === 'RED' || signalColor === 'YELLOW')) {
-              allowedStopPos = Math.min(allowedStopPos, CONSTANTS.STOP_LINE_POS);
+            if (!vehicle.hasClearedStopLine) {
+              if (signalColor === 'RED' || signalColor === 'YELLOW') {
+                allowedStopPos = Math.min(allowedStopPos, CONSTANTS.STOP_LINE_POS);
+              } else if (signalColor === 'GREEN' && this.isConflictingAxisInIntersection(dir)) {
+                allowedStopPos = Math.min(allowedStopPos, CONSTANTS.STOP_LINE_POS);
+              }
             }
           }
 
@@ -459,16 +471,24 @@
             vehicle.speed = Math.min(CONSTANTS.MAX_SPEED, vehicle.speed + CONSTANTS.ACCEL * dt);
           }
 
-          // Advance position with strict boundary clamping
+          // Advance position with strict forward clamping (never snap backwards!)
           const nextPos = vehicle.pos + vehicle.speed * dt;
-          if (allowedStopPos !== CONSTANTS.DESPAWN_POS && nextPos >= allowedStopPos) {
-            vehicle.pos = allowedStopPos;
-            vehicle.speed = 0;
+          if (allowedStopPos !== CONSTANTS.DESPAWN_POS) {
+            if (vehicle.pos <= allowedStopPos && nextPos >= allowedStopPos) {
+              vehicle.pos = allowedStopPos;
+              vehicle.speed = 0;
+            } else if (vehicle.pos > allowedStopPos) {
+              // Vehicle already committed past allowedStopPos: continue forward safely
+              vehicle.pos = nextPos;
+            } else {
+              vehicle.pos = nextPos;
+            }
           } else {
             vehicle.pos = nextPos;
           }
 
-          if (vehicle.pos >= CONSTANTS.STOP_LINE_POS && allowedStopPos === CONSTANTS.DESPAWN_POS) {
+          // Once vehicle center legitimately moves past stop line when permitted, it has committed
+          if (vehicle.pos > CONSTANTS.STOP_LINE_POS && allowedStopPos > CONSTANTS.STOP_LINE_POS) {
             vehicle.hasClearedStopLine = true;
           }
 
@@ -483,16 +503,14 @@
             }
           } else {
             // Vehicle crossed stop line
-            if (!vehicle.hasClearedStopLine) {
-              vehicle.hasClearedStopLine = true;
-              vehicle.isWaiting = false;
-              if (vehicle.waitTime > 0.2) {
-                this.analytics.totalWaitTimeAccumulator += vehicle.waitTime;
-                this.analytics.vehiclesWaitCount++;
-                this.analytics.avgWaitTime = (
-                  this.analytics.totalWaitTimeAccumulator / this.analytics.vehiclesWaitCount
-                );
-              }
+            vehicle.isWaiting = false;
+            if (vehicle.waitTime > 0.2) {
+              this.analytics.totalWaitTimeAccumulator += vehicle.waitTime;
+              this.analytics.vehiclesWaitCount++;
+              this.analytics.avgWaitTime = (
+                this.analytics.totalWaitTimeAccumulator / this.analytics.vehiclesWaitCount
+              );
+              vehicle.waitTime = 0; // Prevent duplicate wait time accumulation
             }
 
             // Check if emergency vehicle has safely cleared the intersection box

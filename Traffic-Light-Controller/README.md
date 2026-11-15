@@ -20,15 +20,17 @@ Traffic-Light-Controller/
 ├── adaptive.js       # Adaptive signal timing engine, demand modeling & XAI rationale
 ├── analytics.js      # Advanced ITS analytics engine, pure SVG sparklines & heatmap
 ├── app.js            # Application controller: DOM bindings, countdown loop & 60fps render
-├── verify.js         # Automated verification suite (50 formal assertions, CLI and in-browser)
+├── verify.js         # Automated verification suite (68 formal assertions, CLI and in-browser)
 ├── README.md         # Architecture, FSM documentation, and verification proofs
 └── docs/             # Comprehensive documentation suite
-    ├── project-overview.md   # Architectural overview, dataflow & design principles
-    ├── fsm-design.md         # Mathematical state definitions, transitions & invariant proofs
-    ├── adaptive-control.md   # Adaptive demand formulas, scaling algorithms & XAI
-    ├── testing-report.md     # 50/50 assertion audit, traceability matrix & test proofs
-    ├── user-guide.md         # End-user operator manual, controls & dashboard guide
-    └── final-audit-report.md # Independent quality assurance & formal audit report
+    ├── project-overview.md        # Architectural overview, dataflow & design principles
+    ├── fsm-design.md              # Mathematical state definitions, transitions & invariant proofs
+    ├── adaptive-control.md        # Adaptive demand formulas, scaling algorithms & XAI
+    ├── testing-report.md          # 50/50 assertion audit, traceability matrix & test proofs
+    ├── user-guide.md              # End-user operator manual, controls & dashboard guide
+    ├── final-audit-report.md      # Independent quality assurance & formal audit report
+    ├── phase-7-investigation.md   # Phase 7 defect investigation & kinematic root causes
+    └── phase-7-remediation-report.md # Phase 7 remediation report & 18-scenario verification proofs
 ```
 
 ---
@@ -45,6 +47,8 @@ For exhaustive technical references, inspect the dedicated documentation manuals
 | **Testing Report** | [`docs/testing-report.md`](./docs/testing-report.md) | Full audit of all 50 verification assertions, requirements traceability matrix, and execution proof. |
 | **User & Operator Guide** | [`docs/user-guide.md`](./docs/user-guide.md) | Complete interface walkthrough, controls, timing modes, emergency dispatching, and dashboard interpretation. |
 | **Final Audit Report** | [`docs/final-audit-report.md`](./docs/final-audit-report.md) | Independent QA validation, 12 edge-case stress results, safety proofs, and readiness assessment. |
+| **Phase 7 Investigation** | [`docs/phase-7-investigation.md`](./docs/phase-7-investigation.md) | Diagnostic analysis and root-cause breakdown of 6 simulation defects (DEF-P7-01 to DEF-P7-06). |
+| **Phase 7 Remediation** | [`docs/phase-7-remediation-report.md`](./docs/phase-7-remediation-report.md) | Remediation report, architecture updates, and verification results across all 18 operational scenarios. |
 
 ---
 
@@ -247,7 +251,7 @@ You can run the full verification suite directly from the terminal:
 node Traffic-Light-Controller/verify.js
 ```
 
-### Full Assertion Audit (50/50 Passing):
+### Full Assertion Audit (68/68 Passing):
 - **Phase 1 (FSM Core & Signals)**:
   - **Test 1**: Initial state is strictly $S0$ with North/South GREEN and East/West RED.
   - **Test 2**: Cyclic sequence fidelity ($S0 \to S1 \to S2 \to S3 \to S0$) over multiple cycles.
@@ -285,6 +289,25 @@ node Traffic-Light-Controller/verify.js
   - **Test 30**: Traffic Efficiency Score: dynamic scoring responsive to queue backlog and delay.
   - **Test 31**: Adaptive timing delay savings benchmark: delay savings actively accumulated against fixed baseline.
   - **Test 32**: Emergency preemption clearance analytics: mean transit duration and clearance success rate verified.
+- **Phase 7 (Simulation Reliability & 18 Operational Scenarios)**:
+  - **Test 33**: Scenario 1: Low traffic continuous 5-minute simulation (0 stuck vehicles, 0 collisions).
+  - **Test 34**: Scenario 2: Medium traffic continuous 5-minute simulation (balanced throughput).
+  - **Test 35**: Scenario 3: High traffic continuous 5-minute stress simulation (safe bumper gaps enforced).
+  - **Test 36**: Scenario 4: Balanced NS/EW traffic allocation ($D_{NS} \approx D_{EW}$).
+  - **Test 37**: Scenario 5: Extremely unbalanced traffic dynamic clamping (25s max green vs 5s min green).
+  - **Test 38**: Scenario 6: Multiple vehicles approaching same stop line halt in order with safe gaps.
+  - **Test 39**: Scenario 7: Queued vehicles discharge and clear intersection sequentially.
+  - **Test 40**: Scenario 8: Emergency dispatch during opposing green triggers safe yellow transition before green.
+  - **Test 41**: Scenario 9: Multiple simultaneous emergency requests handled without dual green conflict.
+  - **Test 42**: Scenario 10: Priority Green actively held open while emergency vehicle transits intersection.
+  - **Test 43**: Scenario 11: All-Red Halt with occupied junction prevents conflicting traffic entry.
+  - **Test 44**: Scenario 12: All-Red recovery restores normal FSM operational state and active green.
+  - **Test 45**: Scenario 13: Simulation pause freezes physics; resume maintains smooth forward kinematics.
+  - **Test 46**: Scenario 14: Simulation reset cleanly purges all vehicle queues, emergency dispatches, and metrics.
+  - **Test 47**: Scenario 15: Speed multiplier acceleration (10x equivalent) maintains numerical stability.
+  - **Test 48**: Scenario 16: Dynamic mode switching between ADAPTIVE, FIXED, and MANUAL operates seamlessly.
+  - **Test 49**: Scenario 17: Vehicle conservation invariant holds continuously: Total Generated = Passed + Active.
+  - **Test 50**: Scenario 18: Long-duration continuous operation avoids unbounded memory growth and frozen vehicles.
 
 ---
 

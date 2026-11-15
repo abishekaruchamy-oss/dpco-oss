@@ -383,6 +383,18 @@
     }
 
     /**
+     * Check if controller is currently holding priority green for an active emergency vehicle
+     * @returns {boolean}
+     */
+    isHoldingPriorityGreen() {
+      return !!(
+        this.emergencyPriority &&
+        this.emergencyPriority.active &&
+        this.currentState === this.emergencyPriority.targetState
+      );
+    }
+
+    /**
      * Reset FSM to initial state S0 (NS Green / EW Red)
      */
     reset() {

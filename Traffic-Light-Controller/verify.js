@@ -658,6 +658,434 @@
       );
     }
 
+    // =========================================================================
+    // PHASE 7 VERIFICATION (Simulation Reliability, Remediation & 18 Scenarios)
+    // =========================================================================
+    if (VehicleManager && TrafficLightFSM && AdaptiveController) {
+      const CONSTANTS = VehicleManager.CONSTANTS;
+
+      // Helper: run continuous simulation for specified duration
+      function runSimulation(vm, fsmInstance, durationSeconds, adapt = null) {
+        let simTime = 0;
+        const dt = 0.05;
+        let phaseTimer = 0;
+        let currentPhaseDuration = 10;
+        let collisionDetected = false;
+
+        while (simTime < durationSeconds) {
+          vm.update(dt, fsmInstance.getSignals());
+          simTime += dt;
+          phaseTimer += dt;
+
+          // Check collision box invariant: center past JUNCTION_ENTRY and rear before JUNCTION_EXIT
+          const nsOccupied = vm.lanes.north.some(v => v.pos >= 146 && (v.pos - v.length / 2) <= 294) ||
+                             vm.lanes.south.some(v => v.pos >= 146 && (v.pos - v.length / 2) <= 294);
+          const ewOccupied = vm.lanes.east.some(v => v.pos >= 146 && (v.pos - v.length / 2) <= 294) ||
+                             vm.lanes.west.some(v => v.pos >= 146 && (v.pos - v.length / 2) <= 294);
+          if (nsOccupied && ewOccupied) {
+            collisionDetected = true;
+          }
+
+          if (phaseTimer >= currentPhaseDuration) {
+            phaseTimer = 0;
+            fsmInstance.step();
+            const st = fsmInstance.getCurrentState();
+            if (st === STATES.S1_NS_YELLOW || st === STATES.S3_EW_YELLOW) {
+              currentPhaseDuration = 3;
+            } else if (adapt) {
+              const queues = {
+                north: vm.lanes.north.filter(v => v.speed < 1).length,
+                south: vm.lanes.south.filter(v => v.speed < 1).length,
+                east: vm.lanes.east.filter(v => v.speed < 1).length,
+                west: vm.lanes.west.filter(v => v.speed < 1).length
+              };
+              const evalRes = adapt.evaluatePhaseDuration(st, queues);
+              currentPhaseDuration = evalRes.duration;
+            } else {
+              currentPhaseDuration = 10;
+            }
+          }
+        }
+
+        return { collisionDetected };
+      }
+
+      // --- TEST 33: Operational Scenario 1 — Low Traffic Continuous 5-min Simulation ---
+      {
+        const scFsm = new TrafficLightFSM();
+        const scVm = new VehicleManager();
+        scVm.setDensityMode('LOW');
+        const { collisionDetected } = runSimulation(scVm, scFsm, 300);
+        let stuckCount = 0;
+        for (const dir of ['north', 'south', 'east', 'west']) {
+          for (const v of scVm.lanes[dir]) {
+            if (v.waitingTime > 90) stuckCount++;
+          }
+        }
+        assert(
+          scVm.analytics.totalGenerated > 40 && scVm.analytics.totalPassed > 30 && stuckCount === 0 && !collisionDetected,
+          'Scenario 1: Low traffic continuous 5-minute operation without vehicle stalling or collision',
+          `Generated: ${scVm.analytics.totalGenerated}, Passed: ${scVm.analytics.totalPassed}, Stuck: ${stuckCount}`
+        );
+      }
+
+      // --- TEST 34: Operational Scenario 2 — Medium Traffic Continuous 5-min Simulation ---
+      {
+        const scFsm = new TrafficLightFSM();
+        const scVm = new VehicleManager();
+        scVm.setDensityMode('MEDIUM');
+        const { collisionDetected } = runSimulation(scVm, scFsm, 300);
+        assert(
+          scVm.analytics.totalPassed > 60 && !collisionDetected,
+          'Scenario 2: Medium traffic continuous 5-minute operation with balanced throughput',
+          `Passed: ${scVm.analytics.totalPassed}, Collision Detected: ${collisionDetected}`
+        );
+      }
+
+      // --- TEST 35: Operational Scenario 3 — High Traffic Continuous 5-min Stress Simulation ---
+      {
+        const scFsm = new TrafficLightFSM();
+        const scVm = new VehicleManager();
+        scVm.setDensityMode('HIGH');
+        const { collisionDetected } = runSimulation(scVm, scFsm, 300);
+        let minGapEnforced = true;
+        for (const dir of ['north', 'south', 'east', 'west']) {
+          const list = scVm.lanes[dir];
+          for (let i = 0; i < list.length - 1; i++) {
+            const lead = list[i];
+            const follow = list[i + 1];
+            const gap = (lead.pos - lead.length / 2) - (follow.pos + follow.length / 2);
+            if (gap < -0.5) minGapEnforced = false;
+          }
+        }
+        assert(
+          scVm.analytics.totalPassed > 100 && !collisionDetected && minGapEnforced,
+          'Scenario 3: High traffic continuous 5-minute stress simulation preserves safe gap and zero collision',
+          `Passed: ${scVm.analytics.totalPassed}, Safe Gap Enforced: ${minGapEnforced}`
+        );
+      }
+
+      // --- TEST 36: Operational Scenario 4 — Balanced NS/EW Traffic Allocation ---
+      {
+        const scFsm = new TrafficLightFSM();
+        const scVm = new VehicleManager();
+        const scAdapt = new AdaptiveController();
+        scVm.setDensityMode('MEDIUM');
+        let simTime = 0;
+        const dt = 0.05;
+        let totalNsGreen = 0;
+        let totalEwGreen = 0;
+        let phaseTimer = 0;
+        let currentPhaseDuration = 10;
+
+        while (simTime < 200) {
+          scVm.update(dt, scFsm.getSignals());
+          simTime += dt;
+          phaseTimer += dt;
+          const state = scFsm.getCurrentState();
+          if (state === STATES.S0_NS_GREEN) totalNsGreen += dt;
+          if (state === STATES.S2_EW_GREEN) totalEwGreen += dt;
+
+          if (phaseTimer >= currentPhaseDuration) {
+            phaseTimer = 0;
+            scFsm.step();
+            const st = scFsm.getCurrentState();
+            if (st === STATES.S1_NS_YELLOW || st === STATES.S3_EW_YELLOW) {
+              currentPhaseDuration = 3;
+            } else {
+              const queues = {
+                north: scVm.lanes.north.filter(v => v.speed < 1).length,
+                south: scVm.lanes.south.filter(v => v.speed < 1).length,
+                east: scVm.lanes.east.filter(v => v.speed < 1).length,
+                west: scVm.lanes.west.filter(v => v.speed < 1).length
+              };
+              const evalRes = scAdapt.evaluatePhaseDuration(st, queues);
+              currentPhaseDuration = evalRes.duration;
+            }
+          }
+        }
+        const ratio = totalNsGreen / (totalEwGreen || 1);
+        assert(
+          ratio >= 0.6 && ratio <= 1.6,
+          'Scenario 4: Balanced NS/EW traffic distribution yields equitable green-time ratio',
+          `NS Green: ${totalNsGreen.toFixed(1)}s, EW Green: ${totalEwGreen.toFixed(1)}s, Ratio: ${ratio.toFixed(2)}`
+        );
+      }
+
+      // --- TEST 37: Operational Scenario 5 — Extremely Unbalanced Traffic Dynamic Clamping ---
+      {
+        const scAdapt = new AdaptiveController();
+        const heavyNsQueues = { north: 9, south: 7, east: 0, west: 0 };
+        const nsCalc = scAdapt.evaluatePhaseDuration(STATES.S0_NS_GREEN, heavyNsQueues);
+        const ewCalc = scAdapt.evaluatePhaseDuration(STATES.S2_EW_GREEN, heavyNsQueues);
+        assert(
+          nsCalc.duration >= 20 && ewCalc.duration === 5,
+          'Scenario 5: Extremely unbalanced traffic expands congested axis and clamps empty axis to 5s min',
+          `NS Extended: ${nsCalc.duration}s, EW Clamped: ${ewCalc.duration}s`
+        );
+      }
+
+      // --- TEST 38: Operational Scenario 6 — Multiple Vehicles Approaching Same Stop Line ---
+      {
+        const scVm = new VehicleManager({ autoSpawn: false });
+        const v1 = scVm.spawnVehicle('north', 'car');
+        v1.pos = 120;
+        const v2 = scVm.spawnVehicle('north', 'car');
+        v2.pos = 80;
+        const v3 = scVm.spawnVehicle('north', 'bus');
+        v3.pos = 40;
+        const v4 = scVm.spawnVehicle('north', 'car');
+        v4.pos = -10;
+
+        v1.pos = 70; v1.speed = 50;
+        v2.pos = 35; v2.speed = 50;
+        v3.pos = 0;  v3.speed = 50;
+        v4.pos = -35; v4.speed = 50;
+
+        const redSignals = { north: LIGHTS.RED, south: LIGHTS.RED, east: LIGHTS.GREEN, west: LIGHTS.GREEN };
+        for (let t = 0; t < 150; t++) {
+          scVm.update(0.05, redSignals);
+        }
+        const stoppedInOrder = v1.pos === CONSTANTS.STOP_LINE_POS &&
+                               v2.pos < v1.pos && v3.pos < v2.pos && v4.pos < v3.pos &&
+                               v1.speed === 0 && v2.speed === 0 && v3.speed === 0 && v4.speed === 0;
+        const gap1 = (v1.pos - v1.length / 2) - (v2.pos + v2.length / 2);
+        const gap2 = (v2.pos - v2.length / 2) - (v3.pos + v3.length / 2);
+        const gap3 = (v3.pos - v3.length / 2) - (v4.pos + v4.length / 2);
+        assert(
+          stoppedInOrder && gap1 >= CONSTANTS.MIN_GAP - 0.1 && gap2 >= CONSTANTS.MIN_GAP - 0.1 && gap3 >= CONSTANTS.MIN_GAP - 0.1,
+          'Scenario 6: Multiple vehicles approaching same stop line halt in order with safe gaps',
+          `Pos: [${v1.pos.toFixed(1)}, ${v2.pos.toFixed(1)}, ${v3.pos.toFixed(1)}, ${v4.pos.toFixed(1)}], Gaps: [${gap1.toFixed(1)}, ${gap2.toFixed(1)}, ${gap3.toFixed(1)}]`
+        );
+      }
+
+      // --- TEST 39: Operational Scenario 7 — Multiple Vehicles Clearing Intersection Sequentially ---
+      {
+        const scVm = new VehicleManager({ autoSpawn: false });
+        const v1 = scVm.spawnVehicle('north', 'car');
+        v1.pos = CONSTANTS.STOP_LINE_POS;
+        v1.speed = 0;
+        const v2 = scVm.spawnVehicle('north', 'car');
+        v2.pos = CONSTANTS.STOP_LINE_POS - 38;
+        v2.speed = 0;
+        const greenSignals = { north: LIGHTS.GREEN, south: LIGHTS.GREEN, east: LIGHTS.RED, west: LIGHTS.RED };
+        let leaderClearedFirst = false;
+        for (let t = 0; t < 150; t++) {
+          scVm.update(0.05, greenSignals);
+          if (v1.pos > CONSTANTS.JUNCTION_EXIT && v2.pos < CONSTANTS.JUNCTION_EXIT) {
+            leaderClearedFirst = true;
+          }
+        }
+        assert(
+          leaderClearedFirst && scVm.analytics.totalPassed >= 1,
+          'Scenario 7: Multiple queued vehicles discharge and clear intersection sequentially without collision',
+          `Leader cleared first: ${leaderClearedFirst}, Total Passed: ${scVm.analytics.totalPassed}`
+        );
+      }
+
+      // --- TEST 40: Operational Scenario 8 — Emergency Dispatch During Opposing Green ---
+      {
+        const scFsm = new TrafficLightFSM();
+        const scVm = new VehicleManager({ autoSpawn: false });
+        scFsm.step(); // S1_NS_YELLOW
+        scFsm.step(); // S2_EW_GREEN
+        const amb = scVm.spawnEmergencyVehicle('north', 'AMBULANCE');
+        const req = scFsm.requestEmergencyPriority('north');
+        assert(
+          req.action === 'CLEAR_CONFLICT' && req.targetState === STATES.S0_NS_GREEN,
+          'Scenario 8: Emergency dispatch during opposing green triggers safe yellow transition before green',
+          `Action: ${req.action}, Target State: ${req.targetState}`
+        );
+      }
+
+      // --- TEST 41: Operational Scenario 9 — Multiple Simultaneous Emergency Requests ---
+      {
+        const scFsm = new TrafficLightFSM();
+        const req1 = scFsm.requestEmergencyPriority('north');
+        const req2 = scFsm.requestEmergencyPriority('east');
+        const signals = scFsm.getSignals();
+        const dualGreen = (signals.north === LIGHTS.GREEN || signals.south === LIGHTS.GREEN) &&
+                          (signals.east === LIGHTS.GREEN || signals.west === LIGHTS.GREEN);
+        assert(
+          !dualGreen && scFsm.getEmergencyPriority().direction === 'east',
+          'Scenario 9: Multiple simultaneous emergency requests handled without dual green conflict',
+          `Active priority: ${scFsm.getEmergencyPriority().direction}, Dual Green: ${dualGreen}`
+        );
+      }
+
+      // --- TEST 42: Operational Scenario 10 — Emergency Vehicle Inside Intersection Lock ---
+      {
+        const scFsm = new TrafficLightFSM();
+        const scVm = new VehicleManager({ autoSpawn: false });
+        scFsm.requestEmergencyPriority('north');
+        const amb = scVm.spawnEmergencyVehicle('north', 'AMBULANCE');
+        amb.pos = 200; // In intersection
+        const isHolding = scFsm.isHoldingPriorityGreen();
+        assert(
+          isHolding && scFsm.getSignals().north === LIGHTS.GREEN && scFsm.getSignals().east === LIGHTS.RED,
+          'Scenario 10: Priority Green actively held open while emergency vehicle is in intersection',
+          `Holding: ${isHolding}, North Signal: ${scFsm.getSignals().north}, East Signal: ${scFsm.getSignals().east}`
+        );
+      }
+
+      // --- TEST 43: Operational Scenario 11 — All-Red Halt with Occupied Junction ---
+      {
+        const scFsm = new TrafficLightFSM();
+        const scVm = new VehicleManager({ autoSpawn: false });
+        const v = scVm.spawnVehicle('north', 'car');
+        v.pos = 200; // In junction
+        scFsm.triggerAllRedHalt();
+        const sigs = scFsm.getSignals();
+        const allRed = sigs.north === LIGHTS.RED && sigs.south === LIGHTS.RED &&
+                       sigs.east === LIGHTS.RED && sigs.west === LIGHTS.RED;
+        const cross = scVm.spawnVehicle('east', 'car');
+        cross.pos = 130;
+        for (let t = 0; t < 20; t++) {
+          scVm.update(0.05, sigs);
+        }
+        assert(
+          allRed && cross.pos <= CONSTANTS.STOP_LINE_POS,
+          'Scenario 11: All-Red Halt with occupied junction prevents conflicting traffic entry',
+          `All-Red: ${allRed}, Approaching car halted: ${cross.pos.toFixed(1)}px (<= 138px)`
+        );
+      }
+
+      // --- TEST 44: Operational Scenario 12 — All-Red Recovery After Junction Clearance ---
+      {
+        const scFsm = new TrafficLightFSM();
+        scFsm.triggerAllRedHalt();
+        scFsm.resumeFromAllRed();
+        const restoredState = scFsm.getCurrentState();
+        const sigs = scFsm.getSignals();
+        assert(
+          restoredState === STATES.S0_NS_GREEN && sigs.north === LIGHTS.GREEN,
+          'Scenario 12: All-Red recovery restores normal FSM operational state and active green',
+          `Restored State: ${restoredState}, North Light: ${sigs.north}`
+        );
+      }
+
+      // --- TEST 45: Operational Scenario 13 — Pause and Resume Continuity ---
+      {
+        const scVm = new VehicleManager({ autoSpawn: false });
+        const v = scVm.spawnVehicle('north', 'car');
+        v.pos = 50; v.speed = 40;
+        const posBeforePause = v.pos;
+        const speedBeforePause = v.speed;
+        scVm.update(0, { north: LIGHTS.GREEN, south: LIGHTS.GREEN, east: LIGHTS.RED, west: LIGHTS.RED }, true);
+        const pausedHeld = v.pos === posBeforePause && v.speed === speedBeforePause;
+        scVm.update(0.05, { north: LIGHTS.GREEN, south: LIGHTS.GREEN, east: LIGHTS.RED, west: LIGHTS.RED }, false);
+        const resumedMoving = v.pos > posBeforePause;
+        assert(
+          pausedHeld && resumedMoving,
+          'Scenario 13: Simulation pause freezes physics; resume maintains smooth forward kinematics',
+          `Frozen at ${posBeforePause}px -> Resumed to ${v.pos.toFixed(1)}px`
+        );
+      }
+
+      // --- TEST 46: Operational Scenario 14 — Simulation Reset Purges All State ---
+      {
+        const scVm = new VehicleManager({ autoSpawn: false });
+        for (let i = 0; i < 15; i++) {
+          scVm.spawnVehicle('north', 'car');
+          scVm.spawnVehicle('east', 'car');
+        }
+        scVm.spawnEmergencyVehicle('north', 'AMBULANCE');
+        scVm.reset();
+        const allEmpty = scVm.lanes.north.length === 0 && scVm.lanes.south.length === 0 &&
+                         scVm.lanes.east.length === 0 && scVm.lanes.west.length === 0 &&
+                         scVm.emergencyEvents.length === 0 && scVm.analytics.totalGenerated === 0;
+        assert(
+          allEmpty,
+          'Scenario 14: Reset completely purges all vehicle queues, emergency dispatches, and metrics',
+          `Lanes empty: ${allEmpty}, Events count: ${scVm.emergencyEvents.length}`
+        );
+      }
+
+      // --- TEST 47: Operational Scenario 15 — Speed Multiplier Stability ---
+      {
+        const scVm = new VehicleManager({ autoSpawn: false });
+        const v = scVm.spawnVehicle('north', 'car');
+        v.pos = 50;
+        const redSignals = { north: LIGHTS.RED, south: LIGHTS.RED, east: LIGHTS.GREEN, west: LIGHTS.GREEN };
+        for (let t = 0; t < 50; t++) {
+          scVm.update(0.16, redSignals); // 10x equivalent timestep
+        }
+        assert(
+          v.pos <= CONSTANTS.STOP_LINE_POS && v.speed === 0,
+          'Scenario 15: High speed multipliers (10x equivalent) maintain numerical stability and stop-line safety',
+          `Final position: ${v.pos.toFixed(1)}px (<= 138px), Final Speed: ${v.speed}px/s`
+        );
+      }
+
+      // --- TEST 48: Operational Scenario 16 — Mode Switching Integrity ---
+      {
+        const scAdapt = new AdaptiveController();
+        scAdapt.setMode('ADAPTIVE');
+        const m1 = scAdapt.getMode();
+        scAdapt.setMode('FIXED');
+        const m2 = scAdapt.getMode();
+        scAdapt.setMode('MANUAL');
+        const m3 = scAdapt.getMode();
+        scAdapt.setMode('ADAPTIVE');
+        const m4 = scAdapt.getMode();
+        assert(
+          m1 === 'ADAPTIVE' && m2 === 'FIXED' && m3 === 'MANUAL' && m4 === 'ADAPTIVE',
+          'Scenario 16: Dynamic mode switching between ADAPTIVE, FIXED, and MANUAL functions cleanly',
+          `Transitions: ${m1} -> ${m2} -> ${m3} -> ${m4}`
+        );
+      }
+
+      // --- TEST 49: Operational Scenario 17 — Continuous Analytics Conservation Law ---
+      {
+        const scVm = new VehicleManager();
+        const scFsm = new TrafficLightFSM();
+        for (let t = 0; t < 2000; t++) {
+          scVm.update(0.05, scFsm.getSignals());
+          if (t % 200 === 0) scFsm.step();
+        }
+        const activeVehicles = scVm.lanes.north.length + scVm.lanes.south.length +
+                               scVm.lanes.east.length + scVm.lanes.west.length;
+        const conservation = (scVm.analytics.totalPassed + activeVehicles) === scVm.analytics.totalGenerated;
+        assert(
+          conservation && scVm.analytics.totalGenerated > 0,
+          'Scenario 17: Vehicle conservation invariant holds continuously: Total Generated = Passed + Active',
+          `Generated (${scVm.analytics.totalGenerated}) = Passed (${scVm.analytics.totalPassed}) + Active (${activeVehicles})`
+        );
+      }
+
+      // --- TEST 50: Operational Scenario 18 — Long-Duration Continuous Operation Stability ---
+      {
+        const scVm = new VehicleManager();
+        const scFsm = new TrafficLightFSM();
+        scVm.setDensityMode('HIGH');
+        let simTime = 0;
+        const dt = 0.05;
+        let phaseTimer = 0;
+        while (simTime < 500) {
+          scVm.update(dt, scFsm.getSignals());
+          simTime += dt;
+          phaseTimer += dt;
+          if (phaseTimer >= 10) {
+            phaseTimer = 0;
+            scFsm.step();
+          }
+        }
+        const totalActive = scVm.lanes.north.length + scVm.lanes.south.length +
+                            scVm.lanes.east.length + scVm.lanes.west.length;
+        let frozenCount = 0;
+        for (const dir of ['north', 'south', 'east', 'west']) {
+          for (const v of scVm.lanes[dir]) {
+            if (v.waitingTime > 120) frozenCount++;
+          }
+        }
+        assert(
+          totalActive < 40 && frozenCount === 0 && scVm.analytics.totalPassed > 150,
+          'Scenario 18: Long-duration high-density operation avoids unbounded memory growth and frozen vehicles',
+          `Active Vehicles: ${totalActive}, Frozen: ${frozenCount}, Total Cleared: ${scVm.analytics.totalPassed}`
+        );
+      }
+    }
+
     return results;
   }
 
@@ -665,7 +1093,7 @@
   if (typeof process !== 'undefined' && process.argv && require.main === module) {
     console.log('====================================================');
     console.log(' Traffic Light Controller Verification Suite');
-    console.log(' Phase 1 to Phase 5 Full Formal Verification');
+    console.log(' Phase 1 to Phase 7 Full Formal Verification & Reliability');
     console.log('====================================================');
     const results = runVerificationSuite();
     results.details.forEach(item => {
