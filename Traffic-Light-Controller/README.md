@@ -27,7 +27,8 @@ Traffic-Light-Controller/
     ├── fsm-design.md         # Mathematical state definitions, transitions & invariant proofs
     ├── adaptive-control.md   # Adaptive demand formulas, scaling algorithms & XAI
     ├── testing-report.md     # 50/50 assertion audit, traceability matrix & test proofs
-    └── user-guide.md         # End-user operator manual, controls & dashboard guide
+    ├── user-guide.md         # End-user operator manual, controls & dashboard guide
+    └── final-audit-report.md # Independent quality assurance & formal audit report
 ```
 
 ---
@@ -43,6 +44,7 @@ For exhaustive technical references, inspect the dedicated documentation manuals
 | **Adaptive Control** | [`docs/adaptive-control.md`](./docs/adaptive-control.md) | Corridor demand formulas ($D_{NS}, D_{EW}$), dynamic green allocation ($5\text{--}25\text{s}$), anti-starvation, and XAI. |
 | **Testing Report** | [`docs/testing-report.md`](./docs/testing-report.md) | Full audit of all 50 verification assertions, requirements traceability matrix, and execution proof. |
 | **User & Operator Guide** | [`docs/user-guide.md`](./docs/user-guide.md) | Complete interface walkthrough, controls, timing modes, emergency dispatching, and dashboard interpretation. |
+| **Final Audit Report** | [`docs/final-audit-report.md`](./docs/final-audit-report.md) | Independent QA validation, 12 edge-case stress results, safety proofs, and readiness assessment. |
 
 ---
 

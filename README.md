@@ -23,6 +23,7 @@ An advanced, browser-native **Intelligent Traffic Management System (ITMS)** bui
 - 🧠 [Adaptive Intelligent Signal Timing & XAI](./Traffic-Light-Controller/docs/adaptive-control.md)
 - 🧪 [Verification & Testing Audit (50/50 Assertions)](./Traffic-Light-Controller/docs/testing-report.md)
 - 📖 [User & Operator Manual](./Traffic-Light-Controller/docs/user-guide.md)
+- 🛡️ [Final Independent Audit & QA Report](./Traffic-Light-Controller/docs/final-audit-report.md)
 
 #### Quick Start
 Open [`Traffic-Light-Controller/index.html`](./Traffic-Light-Controller/index.html) directly in any modern web browser.

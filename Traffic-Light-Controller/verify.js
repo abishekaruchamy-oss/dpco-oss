@@ -1,24 +1,12 @@
 /**
  * Automated Verification Suite for Traffic Light Controller
  *
- * Runs formal invariant assertions:
- * Phase 1 Tests (FSM & Signal Invariants):
- * 1. Cycle Sequence (S0 -> S1 -> S2 -> S3 -> S0)
- * 2. Signal States correctness for all 4 directions (North, South, East, West)
- * 3. Primary Safety Invariant: Conflicting directions NEVER receive green simultaneously
- * 4. Clearance Safety Invariant: Conflicting directions NEVER have active clearance simultaneously
- * 5. Synthetic fault detection test (ensuring safety checker catches illegal states)
- * 6. Deterministic reset behavior and duration integrity
- * 7. Duration configuration update verification
- *
- * Phase 2 Tests (Vehicle Physics, Queuing, Density, Fail-Safe & Analytics):
- * 8. Fail-Safe All-Red Halt FSM transition and recovery
- * 9. Vehicle Movement and Kinematics under Green Light
- * 10. Red-Light Stopping Invariant (vehicles halt safely before stop line)
- * 11. Queue Handling and Anti-Collision Separation (strictly non-overlapping)
- * 12. Conflicting Direction Vehicle Prevention Proof (0 concurrent conflicting box occupancy)
- * 13. Traffic Density Mode configuration integrity
- * 14. Analytics mathematical consistency and conservation laws
+ * Runs formal invariant assertions across all phases:
+ * Phase 1 Tests (FSM & Signal Invariants): Tests 1-7
+ * Phase 2 Tests (Vehicle Physics, Queuing, Density & Fail-Safe): Tests 8-14
+ * Phase 3 Tests (Adaptive Signal Timing & Explainable AI): Tests 15-21
+ * Phase 4 Tests (Emergency Vehicle Priority Preemption): Tests 22-26
+ * Phase 5 Tests (Advanced Traffic Analytics & Telemetry): Tests 27-32
  */
 
 (function (root, factory) {
@@ -677,7 +665,7 @@
   if (typeof process !== 'undefined' && process.argv && require.main === module) {
     console.log('====================================================');
     console.log(' Traffic Light Controller Verification Suite');
-    console.log(' Phase 1 (FSM) + Phase 2 (Vehicles & Safety)');
+    console.log(' Phase 1 to Phase 5 Full Formal Verification');
     console.log('====================================================');
     const results = runVerificationSuite();
     results.details.forEach(item => {
