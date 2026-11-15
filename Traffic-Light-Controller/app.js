@@ -1,7 +1,7 @@
 /**
  * Traffic Light Controller - Application Controller
  * Coordinates UI, DOM updates, countdown timer, FSM transitions,
- * and real-time safety invariant assertions.
+ * real-time safety invariant assertions, vehicle physics & analytics.
  */
 
 (function () {
@@ -16,6 +16,7 @@
 
   // State instances
   let fsm = null;
+  let vehicleManager = null;
   let simStatus = SIM_STATUS.STOPPED;
   let timerInterval = null;
   let remainingSeconds = 10;
@@ -23,6 +24,7 @@
   let speedMultiplier = 1;
   let verifiedTransitionCount = 0;
   let violationCount = 0;
+  let lastAnimTime = performance.now();
 
   // DOM Elements cache
   const elements = {
@@ -31,7 +33,10 @@
     btnPause: document.getElementById('btnPause'),
     btnReset: document.getElementById('btnReset'),
     btnStep: document.getElementById('btnStep'),
+    btnAllRed: document.getElementById('btnAllRed'),
     speedSelect: document.getElementById('speedSelect'),
+    densitySelect: document.getElementById('densitySelect'),
+    densityBadge: document.getElementById('densityBadge'),
     btnRunVerification: document.getElementById('btnRunVerification'),
     btnClearLog: document.getElementById('btnClearLog'),
 
@@ -39,6 +44,25 @@
     badgeStatus: document.getElementById('badgeStatus'),
     badgeInvariant: document.getElementById('badgeInvariant'),
     activeAxisLabel: document.getElementById('activeAxisLabel'),
+
+    // Vehicles Layer
+    vehiclesLayer: document.getElementById('vehiclesLayer'),
+
+    // Analytics KPIs
+    statTotalGenerated: document.getElementById('statTotalGenerated'),
+    statTotalPassed: document.getElementById('statTotalPassed'),
+    statAvgWaitTime: document.getElementById('statAvgWaitTime'),
+    statThroughput: document.getElementById('statThroughput'),
+    queueN: document.getElementById('queueN'),
+    queueS: document.getElementById('queueS'),
+    queueE: document.getElementById('queueE'),
+    queueW: document.getElementById('queueW'),
+    queueCards: {
+      north: document.getElementById('queueCardN'),
+      south: document.getElementById('queueCardS'),
+      east: document.getElementById('queueCardE'),
+      west: document.getElementById('queueCardW')
+    },
 
     // Signals & Timers
     timers: {
@@ -102,6 +126,14 @@
    */
   function init() {
     fsm = new window.TrafficFSM();
+
+    if (window.VehicleManager) {
+      vehicleManager = new window.VehicleManager({
+        containerElement: elements.vehiclesLayer,
+        densityMode: elements.densitySelect ? elements.densitySelect.value : 'MEDIUM'
+      });
+    }
+
     const meta = fsm.getCurrentStateMetadata();
     remainingSeconds = meta.duration;
     elapsedSeconds = 0;
@@ -113,6 +145,58 @@
 
     // Run initial verification to assert startup health
     runAutomatedVerification(false);
+
+    // Start 60fps vehicle animation loop
+    lastAnimTime = performance.now();
+    requestAnimationFrame(animationLoop);
+  }
+
+  /**
+   * Smooth 60fps Animation Loop for Vehicle Physics
+   */
+  function animationLoop(now) {
+    const rawDt = Math.min(0.1, (now - lastAnimTime) / 1000);
+    lastAnimTime = now;
+
+    if (vehicleManager) {
+      const isPaused = (simStatus === SIM_STATUS.PAUSED || simStatus === SIM_STATUS.STOPPED);
+      // Speed multiplier scales physics delta time when running
+      const dt = isPaused ? 0 : rawDt * speedMultiplier;
+      vehicleManager.update(dt, fsm ? fsm.getSignals() : null, isPaused);
+      updateAnalyticsUI();
+    }
+
+    requestAnimationFrame(animationLoop);
+  }
+
+  /**
+   * Update Traffic Analytics UI KPI Badges
+   */
+  function updateAnalyticsUI() {
+    if (!vehicleManager) return;
+    const data = vehicleManager.getAnalytics();
+
+    if (elements.statTotalGenerated) elements.statTotalGenerated.textContent = data.totalGenerated;
+    if (elements.statTotalPassed) elements.statTotalPassed.textContent = data.totalPassed;
+    if (elements.statAvgWaitTime) elements.statAvgWaitTime.textContent = `${data.avgWaitTime.toFixed(1)}s`;
+    if (elements.statThroughput) elements.statThroughput.textContent = `${data.throughput} veh/min`;
+
+    if (elements.queueN) elements.queueN.textContent = data.queueLengths.north;
+    if (elements.queueS) elements.queueS.textContent = data.queueLengths.south;
+    if (elements.queueE) elements.queueE.textContent = data.queueLengths.east;
+    if (elements.queueW) elements.queueW.textContent = data.queueLengths.west;
+
+    // Highlight queue badges
+    ['north', 'south', 'east', 'west'].forEach((dir) => {
+      const card = elements.queueCards[dir];
+      if (card) {
+        if (data.queueLengths[dir] > 0) {
+          card.classList.add('active-queue');
+        } else {
+          card.classList.remove('active-queue');
+        }
+      }
+    });
   }
 
   /**
@@ -192,13 +276,28 @@
     });
 
     // Update traffic flow indicators
-    const nsActive = signals.north === window.TrafficFSM.LIGHTS.GREEN;
-    const nsCaution = signals.north === window.TrafficFSM.LIGHTS.YELLOW;
-    const ewActive = signals.east === window.TrafficFSM.LIGHTS.GREEN;
-    const ewCaution = signals.east === window.TrafficFSM.LIGHTS.YELLOW;
+    const isAllRed = fsm.isAllRedHalt();
+    const nsActive = !isAllRed && signals.north === window.TrafficFSM.LIGHTS.GREEN;
+    const nsCaution = !isAllRed && signals.north === window.TrafficFSM.LIGHTS.YELLOW;
+    const ewActive = !isAllRed && signals.east === window.TrafficFSM.LIGHTS.GREEN;
+    const ewCaution = !isAllRed && signals.east === window.TrafficFSM.LIGHTS.YELLOW;
+
+    if (isAllRed) {
+      elements.flowNS.className = 'flow-indicator flow-ns flow-stopped';
+      elements.flowNS.style.background = 'rgba(239, 68, 68, 0.4)';
+      elements.flowNS.textContent = 'ALL-RED HALT';
+
+      elements.flowEW.className = 'flow-indicator flow-ew flow-stopped';
+      elements.flowEW.style.background = 'rgba(239, 68, 68, 0.4)';
+      elements.flowEW.textContent = 'ALL-RED HALT';
+      return;
+    }
 
     if (nsActive) {
       elements.flowNS.className = 'flow-indicator flow-ns flow-active';
+      elements.flowNS.style.background = '';
+      elements.flowNS.style.color = '';
+      elements.flowNS.style.border = '';
       elements.flowNS.textContent = 'NS FLOWING (GREEN)';
     } else if (nsCaution) {
       elements.flowNS.className = 'flow-indicator flow-ns';
@@ -216,6 +315,9 @@
 
     if (ewActive) {
       elements.flowEW.className = 'flow-indicator flow-ew flow-active';
+      elements.flowEW.style.background = '';
+      elements.flowEW.style.color = '';
+      elements.flowEW.style.border = '';
       elements.flowEW.textContent = 'EW FLOWING (GREEN)';
     } else if (ewCaution) {
       elements.flowEW.className = 'flow-indicator flow-ew';
@@ -253,9 +355,10 @@
       elements.safetyEquation.textContent = 'VIOLATION: Conflicting directions have active green!';
       elements.safetyMetrics.textContent = `Checks: ${verifiedTransitionCount} | VIOLATIONS: ${violationCount}`;
 
-      // Failsafe: Emergency pause
+      // Failsafe: Emergency All-Red Halt
+      fsm.triggerAllRedHalt();
       pauseSimulation();
-      logEvent(`EMERGENCY: Safety Invariant violated! Execution halted.`);
+      logEvent(`EMERGENCY: Safety Invariant violated! Fail-safe all-red triggered.`);
       return false;
     }
 
@@ -284,24 +387,38 @@
     updateSignalsUI(signals);
 
     // Update State Card
-    elements.stateTitle.textContent = `${meta.code}: ${meta.title}`;
-    elements.stateIdBadge.textContent = `Phase ${meta.id + 1} of 4`;
-    elements.stateDesc.textContent = meta.description;
-    elements.activeAxisLabel.textContent = `Active Axis: ${meta.axisActive}`;
-
-    // Countdown and Progress
-    elements.countdownSeconds.textContent = `${remainingSeconds}s`;
-    elements.elapsedSeconds.textContent = `${elapsedSeconds}s`;
-    const totalDuration = meta.duration;
-    const percentage = Math.max(0, Math.min(100, (remainingSeconds / totalDuration) * 100));
-    elements.progressBarFill.style.width = `${percentage}%`;
+    if (fsm.isAllRedHalt()) {
+      elements.stateTitle.textContent = 'FAIL-SAFE: ALL-RED HALT';
+      elements.stateIdBadge.textContent = 'Emergency Mode';
+      elements.stateDesc.textContent = 'All approaches are held at RED. Vehicles stop safely at stop lines.';
+      elements.activeAxisLabel.textContent = 'Active Axis: None (All Red)';
+      elements.countdownSeconds.textContent = 'HOLD';
+      elements.elapsedSeconds.textContent = `${elapsedSeconds}s`;
+      elements.progressBarFill.style.width = '100%';
+      elements.btnAllRed.classList.add('active');
+      elements.btnAllRed.innerHTML = '<span aria-hidden="true">&#8635;</span> Resume Normal';
+    } else {
+      elements.stateTitle.textContent = `${meta.code}: ${meta.title}`;
+      elements.stateIdBadge.textContent = `Phase ${meta.id + 1} of 4`;
+      elements.stateDesc.textContent = meta.description;
+      elements.activeAxisLabel.textContent = `Active Axis: ${meta.axisActive}`;
+      elements.countdownSeconds.textContent = `${remainingSeconds}s`;
+      elements.elapsedSeconds.textContent = `${elapsedSeconds}s`;
+      const totalDuration = meta.duration || 10;
+      const percentage = Math.max(0, Math.min(100, (remainingSeconds / totalDuration) * 100));
+      elements.progressBarFill.style.width = `${percentage}%`;
+      elements.btnAllRed.classList.remove('active');
+      elements.btnAllRed.innerHTML = '<span aria-hidden="true">&#9888;</span> All-Red Halt';
+    }
 
     // Active row highlight in state table
     const allRows = elements.stateTableBody.querySelectorAll('tr');
     allRows.forEach((row) => row.classList.remove('active-row'));
-    const activeRow = document.getElementById(`row-${meta.nextState ? fsm.getCurrentState() : ''}`);
-    if (activeRow) {
-      activeRow.classList.add('active-row');
+    if (!fsm.isAllRedHalt()) {
+      const activeRow = document.getElementById(`row-${fsm.getCurrentState()}`);
+      if (activeRow) {
+        activeRow.classList.add('active-row');
+      }
     }
 
     // Status Badge
@@ -310,6 +427,14 @@
 
   function updateStatusBadge() {
     elements.badgeStatus.className = 'badge badge-status';
+    if (fsm.isAllRedHalt()) {
+      elements.badgeStatus.classList.add('paused');
+      elements.badgeStatus.textContent = 'FAIL-SAFE: ALL-RED';
+      elements.btnStart.disabled = true;
+      elements.btnPause.disabled = true;
+      return;
+    }
+
     if (simStatus === SIM_STATUS.RUNNING) {
       elements.badgeStatus.classList.add('running');
       elements.badgeStatus.textContent = 'SIMULATION: RUNNING';
@@ -332,7 +457,7 @@
    * Simulation Timer Tick Handler (runs once per simulated second)
    */
   function tick() {
-    if (simStatus !== SIM_STATUS.RUNNING) return;
+    if (simStatus !== SIM_STATUS.RUNNING || fsm.isAllRedHalt()) return;
 
     remainingSeconds--;
     elapsedSeconds++;
@@ -352,7 +477,7 @@
    * Start or Resume Simulation
    */
   function startSimulation() {
-    if (simStatus === SIM_STATUS.RUNNING) return;
+    if (simStatus === SIM_STATUS.RUNNING || fsm.isAllRedHalt()) return;
 
     simStatus = SIM_STATUS.RUNNING;
     updateStatusBadge();
@@ -376,7 +501,7 @@
       timerInterval = null;
     }
     updateStatusBadge();
-    logEvent('Simulation paused.');
+    logEvent('Simulation paused. Vehicles holding positions.');
   }
 
   /**
@@ -390,19 +515,49 @@
 
     simStatus = SIM_STATUS.STOPPED;
     fsm.reset();
+
+    if (vehicleManager) {
+      vehicleManager.reset();
+      updateAnalyticsUI();
+    }
+
     const meta = fsm.getCurrentStateMetadata();
     remainingSeconds = meta.duration;
     elapsedSeconds = 0;
 
     updateUI();
-    logEvent('Simulation reset to State S0 (NS Green / EW Red).');
+    logEvent('Simulation reset to State S0 (NS Green / EW Red). All queues cleared.');
+  }
+
+  /**
+   * Toggle Fail-Safe All-Red Halt
+   */
+  function toggleAllRedHalt() {
+    if (fsm.isAllRedHalt()) {
+      fsm.resumeFromAllRed();
+      logEvent('Fail-Safe All-Red Halt released. Resuming normal operations.');
+      if (simStatus === SIM_STATUS.RUNNING) {
+        startSimulation();
+      }
+    } else {
+      fsm.triggerAllRedHalt();
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      logEvent('EMERGENCY: Fail-Safe All-Red Halt activated! All vehicles stopping safely.');
+    }
+    updateUI();
   }
 
   /**
    * Manual Single-Step Transition
    */
   function manualStep() {
-    // If running, pause first
+    if (fsm.isAllRedHalt()) {
+      fsm.resumeFromAllRed();
+    }
+
     if (simStatus === SIM_STATUS.RUNNING) {
       pauseSimulation();
     }
@@ -475,12 +630,26 @@
     elements.btnPause.addEventListener('click', pauseSimulation);
     elements.btnReset.addEventListener('click', resetSimulation);
     elements.btnStep.addEventListener('click', manualStep);
+    elements.btnAllRed.addEventListener('click', toggleAllRedHalt);
+
+    if (elements.densitySelect) {
+      elements.densitySelect.addEventListener('change', (e) => {
+        const mode = e.target.value;
+        if (vehicleManager) {
+          vehicleManager.setDensityMode(mode);
+        }
+        if (elements.densityBadge) {
+          const cap = mode.charAt(0) + mode.slice(1).toLowerCase();
+          elements.densityBadge.textContent = `Mode: ${cap}`;
+        }
+        logEvent(`Traffic density set to ${mode}.`);
+      });
+    }
 
     elements.speedSelect.addEventListener('change', (e) => {
       speedMultiplier = parseFloat(e.target.value) || 1;
       logEvent(`Speed changed to ${speedMultiplier}x.`);
       if (simStatus === SIM_STATUS.RUNNING) {
-        // Restart interval with new speed
         clearInterval(timerInterval);
         timerInterval = setInterval(tick, Math.round(1000 / speedMultiplier));
       }

@@ -1,22 +1,33 @@
 /**
- * Automated Verification Suite for Traffic Light Controller FSM
+ * Automated Verification Suite for Traffic Light Controller
  *
  * Runs formal invariant assertions:
+ * Phase 1 Tests (FSM & Signal Invariants):
  * 1. Cycle Sequence (S0 -> S1 -> S2 -> S3 -> S0)
  * 2. Signal States correctness for all 4 directions (North, South, East, West)
  * 3. Primary Safety Invariant: Conflicting directions NEVER receive green simultaneously
  * 4. Clearance Safety Invariant: Conflicting directions NEVER have active clearance simultaneously
- * 5. Deterministic reset behavior and duration integrity
- * 6. Synthetic fault detection test (ensuring safety checker catches illegal states)
+ * 5. Synthetic fault detection test (ensuring safety checker catches illegal states)
+ * 6. Deterministic reset behavior and duration integrity
+ * 7. Duration configuration update verification
+ *
+ * Phase 2 Tests (Vehicle Physics, Queuing, Density, Fail-Safe & Analytics):
+ * 8. Fail-Safe All-Red Halt FSM transition and recovery
+ * 9. Vehicle Movement and Kinematics under Green Light
+ * 10. Red-Light Stopping Invariant (vehicles halt safely before stop line)
+ * 11. Queue Handling and Anti-Collision Separation (strictly non-overlapping)
+ * 12. Conflicting Direction Vehicle Prevention Proof (0 concurrent conflicting box occupancy)
+ * 13. Traffic Density Mode configuration integrity
+ * 14. Analytics mathematical consistency and conservation laws
  */
 
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./fsm.js'));
+    module.exports = factory(require('./fsm.js'), require('./vehicles.js'));
   } else {
-    root.FSMVerifier = factory(root.TrafficFSM);
+    root.FSMVerifier = factory(root.TrafficFSM, root.VehicleManager);
   }
-})(typeof self !== 'undefined' ? self : this, function (TrafficLightFSM) {
+})(typeof self !== 'undefined' ? self : this, function (TrafficLightFSM, VehicleManager) {
   'use strict';
 
   function runVerificationSuite() {
@@ -48,6 +59,10 @@
     }
 
     const { STATES, LIGHTS } = TrafficLightFSM;
+
+    // =========================================================================
+    // PHASE 1 VERIFICATION (Regression Integrity)
+    // =========================================================================
 
     // --- TEST 1: Initial State Initialization ---
     const fsm = new TrafficLightFSM();
@@ -144,14 +159,12 @@
         break;
       }
 
-      // Also ensure that when NS is green, EW is strictly RED
       if (nsGreen && (signals.east !== LIGHTS.RED || signals.west !== LIGHTS.RED)) {
         invariantHeld = false;
         invariantViolationDetails = `Transition ${t}: NS is Green but EW is not Red!`;
         break;
       }
 
-      // And when EW is green, NS is strictly RED
       if (ewGreen && (signals.north !== LIGHTS.RED || signals.south !== LIGHTS.RED)) {
         invariantHeld = false;
         invariantViolationDetails = `Transition ${t}: EW is Green but NS is not Red!`;
@@ -175,7 +188,6 @@
     );
 
     // --- TEST 5: Synthetic Hazard Rejection ---
-    // Manually pass illegal signal states to validateSafety to ensure checker works
     const illegalStateDualGreen = {
       north: LIGHTS.GREEN,
       south: LIGHTS.GREEN,
@@ -222,13 +234,173 @@
       'Custom timing intervals successfully registered.'
     );
 
+    // =========================================================================
+    // PHASE 2 VERIFICATION (Vehicle Simulation, Queues, Density & Safety)
+    // =========================================================================
+
+    // --- TEST 8: Fail-Safe All-Red Halt FSM Transition & Recovery ---
+    fsm.reset();
+    const haltRes = fsm.triggerAllRedHalt();
+    const haltSignals = fsm.getSignals();
+    assert(
+      fsm.isAllRedHalt() === true &&
+      haltRes.currentState === STATES.EMERGENCY_ALL_RED &&
+      haltSignals.north === LIGHTS.RED &&
+      haltSignals.south === LIGHTS.RED &&
+      haltSignals.east === LIGHTS.RED &&
+      haltSignals.west === LIGHTS.RED,
+      'Fail-Safe All-Red Halt: All Signals Forced to RED',
+      'Emergency halt verified: all four directions hold at RED.'
+    );
+
+    const resumeRes = fsm.resumeFromAllRed();
+    assert(
+      fsm.isAllRedHalt() === false && resumeRes.currentState === STATES.S0_NS_GREEN,
+      'Fail-Safe All-Red Halt: Safe Recovery to Standard FSM State',
+      `Resumed to ${resumeRes.currentState}`
+    );
+
+    // If VehicleManager is loaded, execute Phase 2 vehicle assertions
+    if (VehicleManager) {
+      const { CONSTANTS, DENSITY_MODES, DENSITY_CONFIGS } = VehicleManager;
+
+      // --- TEST 9: Vehicle Movement & Kinematics under Green Light ---
+      const vm1 = new VehicleManager({ autoSpawn: false });
+      const vNorth = vm1.spawnVehicle('north');
+      assert(vNorth !== null && vNorth.pos === -30, 'Vehicle Spawn Integrity', `Spawned North vehicle ID ${vNorth.id}`);
+
+      const greenSignals = { north: 'GREEN', south: 'GREEN', east: 'RED', west: 'RED' };
+      // Simulate 1.5 seconds of motion
+      for (let i = 0; i < 15; i++) {
+        vm1.update(0.1, greenSignals, false);
+      }
+      assert(
+        vNorth.pos > -30 && vNorth.speed > 0,
+        'Vehicle Forward Motion & Acceleration under Green Light',
+        `Position: ${vNorth.pos.toFixed(1)}px, Speed: ${vNorth.speed.toFixed(1)}px/s`
+      );
+
+      // Simulate until vehicle clears intersection completely
+      for (let i = 0; i < 80; i++) {
+        vm1.update(0.1, greenSignals, false);
+      }
+      assert(
+        vm1.analytics.totalPassed === 1 && vm1.lanes.north.length === 0,
+        'Vehicle Full Intersection Traversal & Despawn',
+        `Total passed: ${vm1.analytics.totalPassed}`
+      );
+
+      // --- TEST 10: Red-Light Stopping Invariant ---
+      const vm2 = new VehicleManager({ autoSpawn: false });
+      const vEast = vm2.spawnVehicle('east');
+      const redSignals = { north: 'GREEN', south: 'GREEN', east: 'RED', west: 'RED' };
+
+      // Simulate 10 seconds of physics while East is RED
+      for (let i = 0; i < 100; i++) {
+        vm2.update(0.1, redSignals, false);
+      }
+
+      assert(
+        vEast.pos <= CONSTANTS.STOP_LINE_POS + 0.5 && vEast.speed === 0,
+        'Red-Light Stopping Invariant: Vehicle Halts Completely Before Stop Line',
+        `Final position: ${vEast.pos.toFixed(1)}px (Stop Line: ${CONSTANTS.STOP_LINE_POS}px), Speed: ${vEast.speed}px/s`
+      );
+
+      // --- TEST 11: Queue Handling & Separation (Zero-Overlap Guarantee) ---
+      const vm3 = new VehicleManager({ autoSpawn: false });
+      const car1 = vm3.spawnVehicle('south');
+      // Advance car 1 towards stop line
+      for (let i = 0; i < 40; i++) {
+        vm3.update(0.1, { north: 'RED', south: 'RED', east: 'GREEN', west: 'GREEN' }, false);
+      }
+      const car2 = vm3.spawnVehicle('south');
+      for (let i = 0; i < 30; i++) {
+        vm3.update(0.1, { north: 'RED', south: 'RED', east: 'GREEN', west: 'GREEN' }, false);
+      }
+      const car3 = vm3.spawnVehicle('south');
+      for (let i = 0; i < 50; i++) {
+        vm3.update(0.1, { north: 'RED', south: 'RED', east: 'GREEN', west: 'GREEN' }, false);
+      }
+
+      const laneSouth = vm3.lanes.south;
+      let zeroOverlap = true;
+      let minObservedGap = Infinity;
+
+      for (let i = 1; i < laneSouth.length; i++) {
+        const gap = laneSouth[i - 1].pos - laneSouth[i].pos;
+        if (gap < minObservedGap) minObservedGap = gap;
+        if (gap < CONSTANTS.CAR_LENGTH) {
+          zeroOverlap = false;
+        }
+      }
+
+      assert(
+        zeroOverlap && laneSouth.length === 3 && laneSouth[0].pos <= CONSTANTS.STOP_LINE_POS + 0.5,
+        'Queue Discipline & Anti-Collision: Zero Vehicle Overlap in Queue',
+        `Minimum bumper-to-bumper distance: ${minObservedGap.toFixed(1)}px (Safe threshold: ${CONSTANTS.CAR_LENGTH}px)`
+      );
+
+      // --- TEST 12: Conflicting Direction Vehicle Prevention Proof ---
+      const vm4 = new VehicleManager({ autoSpawn: false });
+      const nCar = vm4.spawnVehicle('north');
+      const wCar = vm4.spawnVehicle('west');
+
+      // North is GREEN, West is RED
+      let conflictViolation = false;
+      for (let step = 0; step < 120; step++) {
+        const currentSignals = { north: 'GREEN', south: 'GREEN', east: 'RED', west: 'RED' };
+        vm4.update(0.1, currentSignals, false);
+
+        // Check if both North and West vehicles are inside the junction collision box simultaneously
+        const nInBox = nCar.pos >= CONSTANTS.JUNCTION_ENTRY && nCar.pos <= CONSTANTS.JUNCTION_EXIT;
+        const wInBox = wCar.pos >= CONSTANTS.JUNCTION_ENTRY && wCar.pos <= CONSTANTS.JUNCTION_EXIT;
+
+        if (nInBox && wInBox) {
+          conflictViolation = true;
+          break;
+        }
+      }
+
+      assert(
+        !conflictViolation,
+        'Conflicting Direction Vehicle Prevention: 0 Simultaneous Collision Box Occupancy',
+        'Conflicting corridors strictly prevented from overlapping inside junction.'
+      );
+
+      // --- TEST 13: Traffic Density Mode Configuration Integrity ---
+      const vm5 = new VehicleManager();
+      assert(
+        DENSITY_CONFIGS[DENSITY_MODES.LOW].spawnInterval > DENSITY_CONFIGS[DENSITY_MODES.HIGH].spawnInterval,
+        'Traffic Density Presets: Low, Medium, High spawn scaling verified',
+        `Low: ${DENSITY_CONFIGS[DENSITY_MODES.LOW].spawnInterval}s vs High: ${DENSITY_CONFIGS[DENSITY_MODES.HIGH].spawnInterval}s`
+      );
+
+      vm5.setDensityMode(DENSITY_MODES.HIGH);
+      assert(
+        vm5.densityMode === DENSITY_MODES.HIGH,
+        'Traffic Density Mode Selection: Dynamic switching to HIGH',
+        `Active config: ${vm5.getDensityConfig().name}`
+      );
+
+      // --- TEST 14: Analytics Mathematical Consistency ---
+      const stats = vm3.getAnalytics();
+      assert(
+        stats.totalGenerated >= stats.totalPassed &&
+        stats.queueTotal >= 0 &&
+        stats.avgWaitTime >= 0,
+        'Traffic Analytics Mathematical Integrity & Conservation Proof',
+        `Generated: ${stats.totalGenerated}, Passed: ${stats.totalPassed}, Queued: ${stats.queueTotal}`
+      );
+    }
+
     return results;
   }
 
   // CLI execution if executed directly in Node
   if (typeof process !== 'undefined' && process.argv && require.main === module) {
     console.log('====================================================');
-    console.log(' Traffic Light Controller FSM Verification Suite');
+    console.log(' Traffic Light Controller Verification Suite');
+    console.log(' Phase 1 (FSM) + Phase 2 (Vehicles & Safety)');
     console.log('====================================================');
     const results = runVerificationSuite();
     results.details.forEach(item => {

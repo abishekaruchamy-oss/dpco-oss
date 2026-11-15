@@ -38,9 +38,20 @@
       <button id="btnStep" class="btn btn-secondary" title="Manually step to next FSM state">
         <span aria-hidden="true">&#8677;</span> Manual Step
       </button>
+      <button id="btnAllRed" class="btn btn-danger" title="Emergency Fail-Safe All-Red Halt">
+        <span aria-hidden="true">&#9888;</span> All-Red Halt
+      </button>
     </div>
 
     <div class="control-group">
+      <div class="density-selector-group">
+        <label for="densitySelect">Density:</label>
+        <select id="densitySelect">
+          <option value="LOW">Low</option>
+          <option value="MEDIUM" selected>Medium</option>
+          <option value="HIGH">High</option>
+        </select>
+      </div>
       <div class="speed-selector">
         <label for="speedSelect">Speed Multiplier:</label>
         <select id="speedSelect">
@@ -97,6 +108,9 @@
           <div class="crosswalk crosswalk-south"></div>
           <div class="crosswalk crosswalk-west"></div>
           <div class="crosswalk crosswalk-east"></div>
+
+          <!-- Vehicles Simulation Layer -->
+          <div id="vehiclesLayer" class="vehicles-layer" aria-hidden="true"></div>
 
           <!-- Flow Status Overlays -->
           <div id="flowNS" class="flow-indicator flow-ns flow-active">NS Flowing</div>
@@ -198,6 +212,53 @@
         </div>
       </section>
 
+      <!-- Traffic Analytics KPI Section -->
+      <section class="panel" style="padding:1rem;" aria-label="Traffic Analytics">
+        <div class="panel-header" style="margin-bottom:0.5rem;">
+          <h2><span>&#128202;</span> Traffic Analytics</h2>
+          <span id="densityBadge" class="badge" style="background:#082f49; color:#38bdf8; font-size:0.7rem;">Mode: Medium</span>
+        </div>
+        <div class="analytics-grid">
+          <div class="kpi-card">
+            <span class="kpi-label">Total Generated</span>
+            <span id="statTotalGenerated" class="kpi-val highlight">0</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Vehicles Passed</span>
+            <span id="statTotalPassed" class="kpi-val throughput">0</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Avg Waiting Time</span>
+            <span id="statAvgWaitTime" class="kpi-val">0.0s</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Throughput (Rate)</span>
+            <span id="statThroughput" class="kpi-val throughput">0 veh/min</span>
+          </div>
+        </div>
+        <div style="margin-top:0.6rem;">
+          <span class="kpi-label">Current Queue Length by Approach:</span>
+          <div class="queue-row">
+            <div id="queueCardN" class="queue-badge">
+              <span class="q-dir">NORTH</span>
+              <span id="queueN" class="q-count">0</span>
+            </div>
+            <div id="queueCardS" class="queue-badge">
+              <span class="q-dir">SOUTH</span>
+              <span id="queueS" class="q-count">0</span>
+            </div>
+            <div id="queueCardE" class="queue-badge">
+              <span class="q-dir">EAST</span>
+              <span id="queueE" class="q-count">0</span>
+            </div>
+            <div id="queueCardW" class="queue-badge">
+              <span class="q-dir">WEST</span>
+              <span id="queueW" class="q-count">0</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- FSM 4-State Cycle Table -->
       <section class="panel" style="padding:1rem;" aria-label="FSM State Transition Matrix">
         <div class="panel-header" style="margin-bottom:0.5rem;">
@@ -253,6 +314,7 @@
 
   <!-- Scripts -->
   <script src="fsm.js"></script>
+  <script src="vehicles.js"></script>
   <script src="verify.js"></script>
   <script src="app.js"></script>
 </body>

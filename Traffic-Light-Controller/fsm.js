@@ -31,7 +31,8 @@
     S0_NS_GREEN: 'S0_NS_GREEN',
     S1_NS_YELLOW: 'S1_NS_YELLOW',
     S2_EW_GREEN: 'S2_EW_GREEN',
-    S3_EW_YELLOW: 'S3_EW_YELLOW'
+    S3_EW_YELLOW: 'S3_EW_YELLOW',
+    EMERGENCY_ALL_RED: 'EMERGENCY_ALL_RED'
   });
 
   const STATE_ORDER = [
@@ -88,6 +89,16 @@
       eastWest: LIGHTS.YELLOW,
       nextState: STATES.S0_NS_GREEN,
       description: 'East and West traffic prepares to stop. North and South corridors hold at red.'
+    },
+    [STATES.EMERGENCY_ALL_RED]: {
+      id: -1,
+      code: 'SAFE_HALT',
+      title: 'EMERGENCY ALL-RED HALT',
+      axisActive: 'All-Stop (Fail-Safe)',
+      northSouth: LIGHTS.RED,
+      eastWest: LIGHTS.RED,
+      nextState: STATES.S0_NS_GREEN,
+      description: 'Fail-safe state: All directions hold at RED. No vehicles permitted into junction.'
     }
   });
 
@@ -98,6 +109,7 @@
     constructor(customDurations = {}) {
       this.durations = { ...DEFAULT_DURATIONS, ...customDurations };
       this.currentState = STATES.S0_NS_GREEN;
+      this.previousStateBeforeHalt = STATES.S0_NS_GREEN;
       this.transitionCount = 0;
       this.history = [];
       this.maxHistoryLength = 50;
@@ -255,10 +267,53 @@
     }
 
     /**
+     * Trigger Fail-Safe All-Red Halt
+     * Switches all 4 directions immediately to RED to halt traffic safely.
+     */
+    triggerAllRedHalt() {
+      if (this.currentState !== STATES.EMERGENCY_ALL_RED) {
+        this.previousStateBeforeHalt = this.currentState;
+      }
+      this.currentState = STATES.EMERGENCY_ALL_RED;
+      const safety = this.validateSafety();
+      return {
+        currentState: this.currentState,
+        signals: this.getSignals(),
+        metadata: this.getCurrentStateMetadata(),
+        safety
+      };
+    }
+
+    /**
+     * Resume from Fail-Safe All-Red Halt back to standard 4-state cycle
+     */
+    resumeFromAllRed() {
+      if (this.currentState === STATES.EMERGENCY_ALL_RED) {
+        this.currentState = this.previousStateBeforeHalt || STATES.S0_NS_GREEN;
+      }
+      const safety = this.validateSafety();
+      return {
+        currentState: this.currentState,
+        signals: this.getSignals(),
+        metadata: this.getCurrentStateMetadata(),
+        safety
+      };
+    }
+
+    /**
+     * Check if controller is currently in fail-safe all-red halt
+     * @returns {boolean}
+     */
+    isAllRedHalt() {
+      return this.currentState === STATES.EMERGENCY_ALL_RED;
+    }
+
+    /**
      * Reset FSM to initial state S0 (NS Green / EW Red)
      */
     reset() {
       this.currentState = STATES.S0_NS_GREEN;
+      this.previousStateBeforeHalt = STATES.S0_NS_GREEN;
       this.transitionCount = 0;
       this.history = [];
       const safety = this.validateSafety();
