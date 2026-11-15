@@ -1,12 +1,12 @@
 # 4-Way Traffic Light Controller (FSM Simulation)
 
-A software-only, zero-dependency 4-Way Traffic Light Controller simulation implemented with a formal **Finite State Machine (FSM)** and physical vehicle queuing dynamics.
+An advanced, software-only, zero-dependency **Intelligent Traffic Management System (ITMS)** implemented with a formal **Finite State Machine (FSM)**, microscopic vehicle kinematics, real-time adaptive signal control, emergency vehicle priority preemption, and pure SVG telemetry.
 
 ---
 
 ## 1. Project Overview & Architecture
 
-This project simulates a busy four-way intersection (North, South, East, West) controlled by a deterministic Finite State Machine with physical vehicle simulation, traffic density presets, and real-time Intelligent Transportation Systems (ITS) analytics. The application runs natively in any standard web browser using pure HTML5, CSS3, and vanilla JavaScript without external libraries, packages, or build steps.
+This project simulates a busy four-way intersection (North, South, East, West) controlled by a deterministic Finite State Machine with physical vehicle queuing dynamics, traffic density presets, and real-time Intelligent Transportation Systems (ITS) analytics. The application runs natively in any standard web browser using pure HTML5, CSS3, and vanilla JavaScript without external libraries, packages, or build steps.
 
 ### File Structure
 All project deliverables are self-contained within `Traffic-Light-Controller/`:
@@ -16,23 +16,43 @@ Traffic-Light-Controller/
 ├── index.html        # Main semantic markup, intersection canvas, controls & analytics dashboard
 ├── style.css         # Styling, realistic glowing signal lamps, vehicles, and KPI grid
 ├── fsm.js            # Pure Finite State Machine core, states, transitions & invariant logic
-├── vehicles.js       # Vehicle physics, queue discipline, traffic density & analytics engine
+├── vehicles.js       # Vehicle physics, queue discipline, traffic density & kinematics engine
 ├── adaptive.js       # Adaptive signal timing engine, demand modeling & XAI rationale
 ├── analytics.js      # Advanced ITS analytics engine, pure SVG sparklines & heatmap
 ├── app.js            # Application controller: DOM bindings, countdown loop & 60fps render
-├── verify.js         # Automated verification suite (runs in CLI and in-browser)
-└── README.md         # Architecture, FSM documentation, and verification proofs
+├── verify.js         # Automated verification suite (50 formal assertions, CLI and in-browser)
+├── README.md         # Architecture, FSM documentation, and verification proofs
+└── docs/             # Comprehensive documentation suite
+    ├── project-overview.md   # Architectural overview, dataflow & design principles
+    ├── fsm-design.md         # Mathematical state definitions, transitions & invariant proofs
+    ├── adaptive-control.md   # Adaptive demand formulas, scaling algorithms & XAI
+    ├── testing-report.md     # 50/50 assertion audit, traceability matrix & test proofs
+    └── user-guide.md         # End-user operator manual, controls & dashboard guide
 ```
 
 ---
 
-## 2. Finite State Machine (FSM) Specification
+## 2. Comprehensive Documentation Suite
+
+For exhaustive technical references, inspect the dedicated documentation manuals:
+
+| Manual | Document Path | Focus Areas |
+|---|---|---|
+| **Project Overview** | [`docs/project-overview.md`](./docs/project-overview.md) | High-level architecture, module contracts, dataflow diagrams, and zero-dependency principles. |
+| **FSM Specification** | [`docs/fsm-design.md`](./docs/fsm-design.md) | 6-tuple formal state automaton, state transition table, invariant proofs, and synthetic fault traps. |
+| **Adaptive Control** | [`docs/adaptive-control.md`](./docs/adaptive-control.md) | Corridor demand formulas ($D_{NS}, D_{EW}$), dynamic green allocation ($5\text{--}25\text{s}$), anti-starvation, and XAI. |
+| **Testing Report** | [`docs/testing-report.md`](./docs/testing-report.md) | Full audit of all 50 verification assertions, requirements traceability matrix, and execution proof. |
+| **User & Operator Guide** | [`docs/user-guide.md`](./docs/user-guide.md) | Complete interface walkthrough, controls, timing modes, emergency dispatching, and dashboard interpretation. |
+
+---
+
+## 3. Finite State Machine (FSM) Specification
 
 The intersection coordinates traffic across two orthogonal axes:
 - **Axis 1 (NS)**: North-South Corridor
 - **Axis 2 (EW)**: East-West Corridor
 
-### 2.1 State Definitions
+### 3.1 State Definitions
 
 | State Code | Identifier | North & South Lights | East & West Lights | Default Duration | Next State | Phase Purpose |
 |---|---|---|---|---|---|---|
@@ -42,7 +62,7 @@ The intersection coordinates traffic across two orthogonal axes:
 | **S3** | `S3_EW_YELLOW` | <span style="color:#ef4444;font-weight:bold;">RED</span> | <span style="color:#f59e0b;font-weight:bold;">YELLOW</span> | 3 seconds | `S0_NS_GREEN` | Clearance interval for East-West vehicles |
 | **FAIL-SAFE** | `EMERGENCY_ALL_RED` | <span style="color:#ef4444;font-weight:bold;">RED</span> | <span style="color:#ef4444;font-weight:bold;">RED</span> | Hold | `S0_NS_GREEN` | All-stop safety state: all vehicles halt safely at stop lines |
 
-### 2.2 State Transition Diagram
+### 3.2 State Transition Diagram
 
 ```
        ┌────────────────────────────────────────────────────────┐
@@ -73,22 +93,22 @@ The intersection coordinates traffic across two orthogonal axes:
 
 ---
 
-## 3. Vehicle Simulation, Physics & Queuing
+## 4. Vehicle Simulation, Physics & Queuing
 
-### 3.1 Kinematics & Approach Trajectories
+### 4.1 Kinematics & Approach Trajectories
 - Vehicles approach the 4-way intersection from all 4 approaches (North, South, East, West).
 - Velocity and deceleration parameters:
   - Max Cruising Speed: $70\text{ px/s}$
   - Acceleration: $95\text{ px/s}^2$
   - Braking Deceleration: $150\text{ px/s}^2$
-- Each vehicle is represented by a 14×26px CSS vehicle model featuring windshield, roof styling, and rear brake lights.
+- Each vehicle is represented by an animated CSS vehicle model featuring windshield, roof styling, and rear brake lights.
 
-### 3.2 Stopping & Queuing Discipline
+### 4.2 Stopping & Queuing Discipline
 - **Stop Line Invariant**: When a signal is **RED** or **YELLOW**, approaching vehicles that have not yet crossed the stop line (`pos = 138px`) decelerate smoothly and halt before the stop line (`pos <= 138px`).
 - **Safe Following Separation**: Following vehicles in a queue maintain a strict minimum bumper-to-bumper distance of at least $38\text{px}$ (`CAR_LENGTH + MIN_GAP`), preventing overlaps.
-- **Intersection Clearance Lock**: When a signal turns GREEN, oncoming vehicles verify that the orthogonal conflict box is empty before entering the junction. If a clearance vehicle is still finishing its transit, oncoming traffic waits before crossing.
+- **Intersection Clearance Lock**: When a signal turns GREEN, oncoming vehicles verify that the orthogonal conflict box is empty before entering the junction.
 
-### 3.3 Traffic Density Presets
+### 4.3 Traffic Density Presets
 Three density modes are selectable in real-time:
 1. **Low Traffic**: Average spawn interval $\sim 4.5\text{s}$, light arrivals ($0\text{--}2$ cars in queue).
 2. **Medium Traffic**: Average spawn interval $\sim 2.8\text{s}$, steady commuter stream ($2\text{--}4$ cars in queue).
@@ -96,20 +116,7 @@ Three density modes are selectable in real-time:
 
 ---
 
-## 4. Traffic Analytics & ITS KPIs
-
-The simulation calculates and displays real-time performance indicators:
-- **Total Vehicles Generated**: Cumulative count of vehicles spawned across all four approaches.
-- **Vehicles Passed**: Cumulative count of vehicles that safely navigated and exited the intersection.
-- **Current Queue Lengths**: Discrete queue counters for **North**, **South**, **East**, and **West**, with visual badges highlighting active congestion.
-- **Average Waiting Time**: Running mean of seconds spent waiting in queue before crossing the stop line:
-  $$\text{AvgWaitTime} = \frac{\sum \text{VehicleWaitDuration}}{\text{Count}}$$
-- **Throughput Rate**: Real-time traffic throughput normalized to vehicles per minute:
-  $$\text{Throughput} = \frac{\text{VehiclesPassed}}{\text{SimulationTimeSeconds}} \times 60$$
-
----
-
-## 5. Adaptive Intelligent Signal Timing & Explainable AI (Phase 3)
+## 5. Adaptive Intelligent Signal Timing & Explainable AI (XAI)
 
 The Adaptive Signal Control Engine dynamically tailors green intervals to real-time traffic conditions while maintaining deterministic FSM transitions.
 
@@ -124,7 +131,7 @@ $$D_{\text{EW}} = (Q_{\text{East}} + Q_{\text{West}}) + 0.4 \times (A_{\text{Eas
 - **Zero-Demand Truncation**: If an active corridor has zero waiting vehicles while the opposing street has backlog, green time is truncated to $T_{\text{min}} = 5\text{s}$ to expedite cycle rotation.
 - **Strict Boundary Bounds**:
   $$5\text{s} \le T_{\text{green}} \le 25\text{s}$$
-- **Anti-Starvation Safeguard**: If an approach is held at minimum green for 2 consecutive cycles while cross traffic is high, the anti-starvation boost automatically grants extra green time (14s) to ensure fair throughput.
+- **Anti-Starvation Safeguard**: If an approach is held at minimum green for 2 consecutive cycles while cross traffic is high, the anti-starvation boost automatically grants extra green time ($14\text{s}$) to ensure fair throughput.
 - **Yellow Clearance Inviolability**: The 3-second yellow clearance interval is **never** compressed or bypassed under any adaptive condition.
 
 ### 5.3 Operating Modes
@@ -140,7 +147,7 @@ Every timing decision produces a human-interpretable rationale displayed directl
 
 ---
 
-## 6. Emergency Vehicle Priority Preemption (Phase 4)
+## 6. Emergency Vehicle Priority Preemption
 
 Provides dynamic, software-based priority preemption for emergency first responders while strictly enforcing yellow clearance safety invariants.
 
@@ -161,7 +168,7 @@ Provides dynamic, software-based priority preemption for emergency first respond
 
 ---
 
-## 7. Advanced Traffic Analytics, Heatmap & SVG Sparklines (Phase 5)
+## 7. Advanced Traffic Analytics, Heatmap & SVG Sparklines
 
 Provides deep ITS observability without relying on bulky external charting libraries (zero dependencies):
 
@@ -184,7 +191,7 @@ Provides deep ITS observability without relying on bulky external charting libra
 
 ## 8. Safety Invariant Proof & Fail-Safe Design
 
-### 5.1 Primary Safety Invariant
+### 8.1 Primary Safety Invariant
 > **Critical Requirement**: Conflicting directions must **NEVER** receive green simultaneously.
 
 Formally:
@@ -196,12 +203,12 @@ In every state $S \in \{S0, S1, S2, S3\}$:
 - In $S2$: $\text{NS} = \text{RED}$, $\text{EW} = \text{GREEN}$. Conflicting green is impossible.
 - In $S3$: $\text{NS} = \text{RED}$, $\text{EW} = \text{YELLOW}$. Conflicting green is impossible.
 
-### 5.2 Clearance Isolation Invariant
+### 8.2 Clearance Isolation Invariant
 An active corridor clearance ($\text{YELLOW}$) never overlaps with opposing movement:
 $$\neg \Big( \text{Active}(\text{NS}) \land \text{Active}(\text{EW}) \Big)$$
 where $\text{Active}(\text{axis}) = (\text{Signal} = \text{GREEN} \lor \text{Signal} = \text{YELLOW})$.
 
-### 5.3 Fail-Safe All-Red Halt
+### 8.3 Fail-Safe All-Red Halt
 An operator can trigger the **All-Red Halt** button at any time. When triggered or in the event of an anomaly:
 - All 4 traffic signals switch immediately to **RED**.
 - Approaching vehicles immediately halt behind stop lines.
@@ -210,7 +217,7 @@ An operator can trigger the **All-Red Halt** button at any time. When triggered 
 
 ---
 
-## 6. Features & Controls
+## 9. Features & Controls
 
 1. **Four-Way Junction Visualization**:
    - Asphalt roadways with curb borders, stop lines, center grid box, and pedestrian zebra crossings.
@@ -226,11 +233,11 @@ An operator can trigger the **All-Red Halt** button at any time. When triggered 
    - Density: Low, Medium, High.
    - Speed Multiplier: `1x` (real-time), `2x` (accelerated), `5x` (rapid testing).
 4. **Interactive Verification Runner**:
-   - Click "Run Invariant Tests" in the web UI to run the 23-assertion test suite in-browser.
+   - Click "Run Invariant Tests" in the web UI to run the 50-assertion test suite in-browser.
 
 ---
 
-## 7. Verification & Automated Testing
+## 10. Verification & Automated Testing
 
 ### Running Tests in Node.js (Zero Dependencies)
 You can run the full verification suite directly from the terminal:
@@ -238,15 +245,15 @@ You can run the full verification suite directly from the terminal:
 node Traffic-Light-Controller/verify.js
 ```
 
-### Verification Assertions Tested (44/44 Passing):
+### Full Assertion Audit (50/50 Passing):
 - **Phase 1 (FSM Core & Signals)**:
   - **Test 1**: Initial state is strictly $S0$ with North/South GREEN and East/West RED.
   - **Test 2**: Cyclic sequence fidelity ($S0 \to S1 \to S2 \to S3 \to S0$) over multiple cycles.
-  - **Test 3**: Directional light outputs verify exact colors for all 4 approaches.
+  - **Test 3**: Directional light outputs verify exact colors for all 4 approaches across states.
   - **Test 4**: Primary Safety Invariant proof over 200 consecutive transitions (zero conflicting greens).
-  - **Test 5**: Synthetic fault injection: verifies that illegal dual-green and dual-clearance states are caught.
-  - **Test 6**: Reset restores initial state $S0$ and clears transition counters.
-  - **Test 7**: Custom state duration updates correctly apply and respect minimum bounds.
+  - **Test 5**: Synthetic fault injection: verifies that illegal dual-green states are trapped (`ERR_DUAL_GREEN`).
+  - **Test 6**: Synthetic fault injection: verifies that illegal dual-clearance states are trapped (`ERR_DUAL_ACTIVE`).
+  - **Test 7**: Reset restores initial state $S0$, resets transition counters, and accepts custom timings.
 - **Phase 2 (Vehicles, Queuing & Safety)**:
   - **Test 8**: Fail-Safe All-Red Halt forces all signals to RED and recovers safely.
   - **Test 9**: Vehicle movement and kinematics accelerate and traverse intersection under green signal.
@@ -257,25 +264,33 @@ node Traffic-Light-Controller/verify.js
   - **Test 14**: Analytics mathematical consistency and conservation laws.
 - **Phase 3 (Adaptive Signal Timing & XAI)**:
   - **Test 15**: Adaptive controller default mode and clean switching (ADAPTIVE, FIXED, MANUAL).
-  - **Test 16**: Balanced traffic demand triggers nominal base green duration (10s).
+  - **Test 16**: Balanced traffic demand triggers nominal base green duration ($10\text{s}$).
   - **Test 17**: Heavy North-South congestion scales green duration upwards with explainability rationale.
   - **Test 18**: Heavy East-West congestion scales green duration upwards with explainability rationale.
   - **Test 19**: Extreme traffic strictly clamped to $T_{\text{max}} = 25\text{s}$; zero demand truncated to $T_{\text{min}} = 5\text{s}$.
   - **Test 20**: Anti-starvation invariant boosts green time after consecutive low-allocation cycles.
-  - **Test 21**: Yellow clearance (3s) remains inviolable under dynamic adaptive scaling.
+  - **Test 21**: Yellow clearance ($3\text{s}$) remains inviolable under dynamic adaptive scaling.
 - **Phase 4 (Emergency Vehicle Priority Preemption)**:
   - **Test 22**: Multi-class vehicle instantiation: Ambulance, Fire Engine, Police with proper dimensions and emergency flags.
   - **Test 23**: Preemption safety: Conflicting green prompts yellow clearance, never instant conflicting switch.
   - **Test 24**: Active green extension: Green held open while emergency vehicle approaches.
   - **Test 25**: Priority release invariant: Priority lock released once emergency vehicle exits the junction.
   - **Test 26**: Emergency event logging: Dispatch telemetries recorded in audit log with timestamps.
+- **Phase 5 (Advanced Traffic Analytics & Telemetry)**:
+  - **Test 27**: Analytics snapshot data model and queue aggregation integrity across corridors.
+  - **Test 28**: Approach congestion heatmap: heat normalized accurately across $[0.0, 1.0]$.
+  - **Test 29**: Pure SVG queue history sparkline generation: self-contained zero-dependency chart rendering.
+  - **Test 30**: Traffic Efficiency Score: dynamic scoring responsive to queue backlog and delay.
+  - **Test 31**: Adaptive timing delay savings benchmark: delay savings actively accumulated against fixed baseline.
+  - **Test 32**: Emergency preemption clearance analytics: mean transit duration and clearance success rate verified.
 
 ---
 
-## 8. How to Run
+## 11. How to Run
 
-1. Open `Traffic-Light-Controller/index.html` directly in any modern web browser (Chrome, Edge, Firefox, Safari).
+1. Open [`Traffic-Light-Controller/index.html`](./index.html) directly in any modern web browser (Chrome, Edge, Firefox, Safari).
 2. Click **Start** to run the simulation.
 3. Switch **Density** (Low / Medium / High) to observe queuing dynamics.
 4. Test the **All-Red Halt** button to observe fail-safe stopping.
-5. Click **Run Invariant Tests** to execute in-browser verification proofs.
+5. Use the **Emergency Dispatcher** to trigger high-priority preemption runs.
+6. Click **Run Invariant Tests** to execute in-browser verification proofs.

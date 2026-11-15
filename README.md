@@ -6,13 +6,23 @@ Open-source digital principles and computer organization academic mini-projects 
 
 ## Projects Directory
 
-### 🚦 [Traffic Light Controller](./Traffic-Light-Controller)
-An advanced, browser-native Intelligent Traffic Management System built with:
-- **Finite State Machine (FSM)** Architecture ($S0 \to S1 \to S2 \to S3 \to S0$)
-- **Physical Vehicle Simulation**: 4-way approach trajectories, acceleration, braking, queue separation
-- **Adaptive Intelligent Signal Timing**: Real-time queue demand analysis & Explainable AI (XAI)
-- **ITS Traffic Analytics Dashboard**: Throughput, average wait times, directional queue counters
-- **Safety Invariants & Fail-Safe All-Red Halt**: Strict clearance isolation, zero dual greens, automated formal testing
-- Zero external dependencies: pure HTML5, CSS3, and vanilla JavaScript.
+### 🚦 [Traffic Light Controller — Intelligent Traffic Management System](./Traffic-Light-Controller)
 
-To run: Open [`Traffic-Light-Controller/index.html`](./Traffic-Light-Controller/index.html) directly in any web browser.
+An advanced, browser-native **Intelligent Traffic Management System (ITMS)** built under a zero-dependency architecture with pure HTML5, CSS3, and vanilla JavaScript:
+
+- **Formal Finite State Machine (FSM)**: Cyclic 4-state coordination ($S_0 \to S_1 \to S_2 \to S_3 \to S_0$) with mathematical safety invariants preventing conflicting green signals.
+- **Microscopic Vehicle Simulation**: 4-way approach trajectories, Newtonian kinematics (acceleration, cruise, braking), collision-free queue discipline ($\ge 38\text{px}$ bumper gap), and density presets (Low, Medium, High).
+- **Adaptive Intelligent Signal Timing**: Dynamic corridor demand sensing ($D_{NS}, D_{EW}$), queue-responsive green interval scaling ($5\text{s} \le T \le 25\text{s}$), anti-starvation fair throughput guarantees, and Explainable AI (XAI) decision rationales.
+- **Emergency Vehicle Priority Preemption**: High-priority dispatching for Ambulances, Fire Engines, and Police Cruisers with safe yellow clearance transitions, active green extension, and automatic priority release.
+- **Advanced ITS Analytics & Pure SVG Telemetry**: Real-time rolling queue sparklines rendered via pure SVG, 4-quadrant approach congestion heatmap, continuous Traffic Efficiency Scoring ($15\text{--}99\%$), and adaptive delay savings accounting.
+- **Formal Verification Suite**: 50 automated deterministic assertions executable via Node.js CLI (`node verify.js`) or interactively inside the web browser with 100% pass rate.
+
+#### Technical Documentation
+- 📘 [Project Overview & Architecture](./Traffic-Light-Controller/docs/project-overview.md)
+- ⚙️ [Finite State Machine Specification & Invariant Proofs](./Traffic-Light-Controller/docs/fsm-design.md)
+- 🧠 [Adaptive Intelligent Signal Timing & XAI](./Traffic-Light-Controller/docs/adaptive-control.md)
+- 🧪 [Verification & Testing Audit (50/50 Assertions)](./Traffic-Light-Controller/docs/testing-report.md)
+- 📖 [User & Operator Manual](./Traffic-Light-Controller/docs/user-guide.md)
+
+#### Quick Start
+Open [`Traffic-Light-Controller/index.html`](./Traffic-Light-Controller/index.html) directly in any modern web browser.
