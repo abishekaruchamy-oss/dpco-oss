@@ -46,6 +46,14 @@
     demandFillEW: document.getElementById('demandFillEW'),
     adaptiveRationaleText: document.getElementById('adaptiveRationaleText'),
     adaptiveCalculatedDuration: document.getElementById('adaptiveCalculatedDuration'),
+    emergencyDirSelect: document.getElementById('emergencyDirSelect'),
+    btnDispatchAmb: document.getElementById('btnDispatchAmb'),
+    btnDispatchFire: document.getElementById('btnDispatchFire'),
+    btnDispatchPolice: document.getElementById('btnDispatchPolice'),
+    emergencyBanner: document.getElementById('emergencyBanner'),
+    emergencyBannerText: document.getElementById('emergencyBannerText'),
+    emergencyBannerPhase: document.getElementById('emergencyBannerPhase'),
+    statEmergencyCount: document.getElementById('statEmergencyCount'),
     btnRunVerification: document.getElementById('btnRunVerification'),
     btnClearLog: document.getElementById('btnClearLog'),
 
@@ -131,6 +139,49 @@
   };
 
   /**
+   * Handle Inbound Emergency Priority Request
+   */
+  function handleEmergencyRequest(direction, vehicle) {
+    const decision = fsm.requestEmergencyPriority(direction);
+    const typeName = vehicle.type.replace('_', ' ');
+
+    if (elements.emergencyBanner) {
+      elements.emergencyBanner.style.display = 'flex';
+      elements.emergencyBannerText.textContent = `${typeName} from ${direction.toUpperCase()}`;
+      elements.emergencyBannerPhase.textContent = decision.status === 'ACTIVE_GREEN_EXTENDED'
+        ? 'Green Extended (Holding Priority)'
+        : 'Securing Clearance...';
+    }
+
+    logEvent(`🚨 EMERGENCY PREEMPTION: ${typeName} dispatched on ${direction.toUpperCase()} approach. Decision: ${decision.status}`);
+
+    if (decision.action === 'CLEAR_CONFLICT') {
+      // Conflicting corridor has green: immediately accelerate to yellow clearance (never skip yellow!)
+      if (remainingSeconds > 3) {
+        remainingSeconds = 3;
+      }
+    } else if (decision.action === 'HOLD') {
+      remainingSeconds = Math.max(remainingSeconds, 15);
+    }
+
+    updateUI();
+  }
+
+  /**
+   * Handle Emergency Priority Cleared (Vehicle exited intersection)
+   */
+  function handleEmergencyCleared(direction, vehicle) {
+    fsm.clearEmergencyPriority();
+
+    if (elements.emergencyBanner) {
+      elements.emergencyBanner.style.display = 'none';
+    }
+
+    logEvent(`✅ PRIORITY CLEARED: ${vehicle.type.replace('_', ' ')} safely exited intersection. Normal timing restored.`);
+    updateUI();
+  }
+
+  /**
    * Initialize Application
    */
   function init() {
@@ -143,7 +194,9 @@
     if (window.VehicleManager) {
       vehicleManager = new window.VehicleManager({
         containerElement: elements.vehiclesLayer,
-        densityMode: elements.densitySelect ? elements.densitySelect.value : 'MEDIUM'
+        densityMode: elements.densitySelect ? elements.densitySelect.value : 'MEDIUM',
+        onEmergencyRequest: handleEmergencyRequest,
+        onEmergencyCleared: handleEmergencyCleared
       });
     }
 
@@ -193,6 +246,7 @@
     if (elements.statTotalPassed) elements.statTotalPassed.textContent = data.totalPassed;
     if (elements.statAvgWaitTime) elements.statAvgWaitTime.textContent = `${data.avgWaitTime.toFixed(1)}s`;
     if (elements.statThroughput) elements.statThroughput.textContent = `${data.throughput} veh/min`;
+    if (elements.statEmergencyCount) elements.statEmergencyCount.textContent = data.emergencyCount || 0;
 
     if (elements.queueN) elements.queueN.textContent = data.queueLengths.north;
     if (elements.queueS) elements.queueS.textContent = data.queueLengths.south;
@@ -706,6 +760,33 @@
           }
         }
         logEvent(`Timing mode set to ${mode}.`);
+      });
+    }
+
+    if (elements.btnDispatchAmb) {
+      elements.btnDispatchAmb.addEventListener('click', () => {
+        const dir = elements.emergencyDirSelect ? elements.emergencyDirSelect.value : 'north';
+        if (vehicleManager) {
+          vehicleManager.spawnEmergencyVehicle(dir, 'AMBULANCE');
+        }
+      });
+    }
+
+    if (elements.btnDispatchFire) {
+      elements.btnDispatchFire.addEventListener('click', () => {
+        const dir = elements.emergencyDirSelect ? elements.emergencyDirSelect.value : 'north';
+        if (vehicleManager) {
+          vehicleManager.spawnEmergencyVehicle(dir, 'FIRE_ENGINE');
+        }
+      });
+    }
+
+    if (elements.btnDispatchPolice) {
+      elements.btnDispatchPolice.addEventListener('click', () => {
+        const dir = elements.emergencyDirSelect ? elements.emergencyDirSelect.value : 'north';
+        if (vehicleManager) {
+          vehicleManager.spawnEmergencyVehicle(dir, 'POLICE');
+        }
       });
     }
 

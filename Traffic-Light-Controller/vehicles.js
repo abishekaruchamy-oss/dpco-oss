@@ -25,6 +25,57 @@
     HIGH: 'HIGH'
   });
 
+  const VEHICLE_TYPES = Object.freeze({
+    CAR: 'CAR',
+    BUS: 'BUS',
+    AMBULANCE: 'AMBULANCE',
+    FIRE_ENGINE: 'FIRE_ENGINE',
+    POLICE: 'POLICE'
+  });
+
+  const VEHICLE_SPECS = Object.freeze({
+    [VEHICLE_TYPES.CAR]: {
+      name: 'Car',
+      width: 14,
+      length: 26,
+      maxSpeed: 70,
+      isEmergency: false,
+      color: '#38bdf8'
+    },
+    [VEHICLE_TYPES.BUS]: {
+      name: 'Transit Bus',
+      width: 16,
+      length: 36,
+      maxSpeed: 60,
+      isEmergency: false,
+      color: '#f59e0b'
+    },
+    [VEHICLE_TYPES.AMBULANCE]: {
+      name: 'Ambulance',
+      width: 16,
+      length: 30,
+      maxSpeed: 90,
+      isEmergency: true,
+      color: '#ffffff'
+    },
+    [VEHICLE_TYPES.FIRE_ENGINE]: {
+      name: 'Fire Engine',
+      width: 18,
+      length: 36,
+      maxSpeed: 88,
+      isEmergency: true,
+      color: '#ef4444'
+    },
+    [VEHICLE_TYPES.POLICE]: {
+      name: 'Police Cruiser',
+      width: 14,
+      length: 28,
+      maxSpeed: 95,
+      isEmergency: true,
+      color: '#1e3a8a'
+    }
+  });
+
   const DENSITY_CONFIGS = Object.freeze({
     [DENSITY_MODES.LOW]: {
       name: 'Low Traffic',
@@ -74,16 +125,24 @@
     /**
      * @param {number} id
      * @param {string} direction 'north' | 'south' | 'east' | 'west'
-     * @param {string} color
+     * @param {string} [type='CAR'] VEHICLE_TYPES
+     * @param {string} [color]
      */
-    constructor(id, direction, color) {
+    constructor(id, direction, type = VEHICLE_TYPES.CAR, color = null) {
       this.id = id;
       this.direction = direction;
-      this.color = color;
-      this.pos = -30; // Starts off-canvas
+      this.type = type;
+      const spec = VEHICLE_SPECS[type] || VEHICLE_SPECS[VEHICLE_TYPES.CAR];
+      this.width = spec.width;
+      this.length = spec.length;
+      this.maxSpeed = spec.maxSpeed;
+      this.isEmergency = spec.isEmergency;
+      this.color = color || spec.color;
+      this.pos = -40; // Starts off-canvas
       this.speed = 0;
-      this.targetSpeed = CONSTANTS.MAX_SPEED;
+      this.targetSpeed = this.maxSpeed;
       this.hasClearedStopLine = false;
+      this.hasClearedIntersection = false;
       this.waitTime = 0; // Cumulative wait time in queue in seconds
       this.isWaiting = false;
       this.domElement = null;
@@ -131,6 +190,10 @@
     constructor(options = {}) {
       this.densityMode = options.densityMode || DENSITY_MODES.MEDIUM;
       this.autoSpawn = options.autoSpawn !== false;
+      this.containerElement = options.containerElement || null;
+      this.onEmergencyRequest = options.onEmergencyRequest || null;
+      this.onEmergencyCleared = options.onEmergencyCleared || null;
+
       this.lanes = {
         north: [],
         south: [],
@@ -147,6 +210,7 @@
 
       this.nextVehicleId = 1;
       this.totalSimulationTime = 0;
+      this.emergencyEvents = [];
 
       // Analytics
       this.analytics = {
@@ -156,10 +220,9 @@
         vehiclesWaitCount: 0,
         avgWaitTime: 0,
         queueLengths: { north: 0, south: 0, east: 0, west: 0 },
-        throughput: 0 // vehicles per minute
+        throughput: 0,
+        emergencyCount: 0
       };
-
-      this.containerElement = options.containerElement || null;
     }
 
     /**
@@ -208,7 +271,7 @@
     /**
      * Spawn a vehicle in the specified lane if capacity and spacing permit
      */
-    spawnVehicle(direction) {
+    spawnVehicle(direction, type = null) {
       const lane = this.lanes[direction];
       const config = this.getDensityConfig();
 
@@ -224,14 +287,17 @@
         }
       }
 
+      const vehicleType = type || (Math.random() < 0.18 ? VEHICLE_TYPES.BUS : VEHICLE_TYPES.CAR);
       const color = VEHICLE_COLORS[(this.nextVehicleId - 1) % VEHICLE_COLORS.length];
-      const vehicle = new Vehicle(this.nextVehicleId++, direction, color);
+      const vehicle = new Vehicle(this.nextVehicleId++, direction, vehicleType, color);
 
       // Create DOM element if container is attached
       if (this.containerElement && typeof document !== 'undefined') {
         const el = document.createElement('div');
-        el.className = 'sim-vehicle';
-        el.style.backgroundColor = color;
+        el.className = `sim-vehicle veh-${vehicle.type.toLowerCase().replace('_', '-')}`;
+        el.style.backgroundColor = vehicle.color;
+        el.style.width = `${vehicle.width}px`;
+        el.style.height = `${vehicle.length}px`;
         el.id = `veh-${vehicle.id}`;
         this.containerElement.appendChild(el);
         vehicle.domElement = el;
@@ -239,6 +305,48 @@
 
       lane.push(vehicle);
       this.analytics.totalGenerated++;
+      return vehicle;
+    }
+
+    /**
+     * Spawn an Emergency Priority Vehicle (Ambulance, Fire Engine, Police)
+     * Triggers priority preemption callback for the approaching direction.
+     * @param {string} direction 'north' | 'south' | 'east' | 'west'
+     * @param {string} emergencyType 'AMBULANCE' | 'FIRE_ENGINE' | 'POLICE'
+     */
+    spawnEmergencyVehicle(direction, emergencyType = VEHICLE_TYPES.AMBULANCE) {
+      const lane = this.lanes[direction];
+      const type = VEHICLE_TYPES[emergencyType] || VEHICLE_TYPES.AMBULANCE;
+      const vehicle = new Vehicle(this.nextVehicleId++, direction, type);
+
+      if (this.containerElement && typeof document !== 'undefined') {
+        const el = document.createElement('div');
+        el.className = `sim-vehicle veh-${vehicle.type.toLowerCase().replace('_', '-')} emergency-active`;
+        el.style.backgroundColor = vehicle.color;
+        el.style.width = `${vehicle.width}px`;
+        el.style.height = `${vehicle.length}px`;
+        el.id = `veh-${vehicle.id}`;
+        this.containerElement.appendChild(el);
+        vehicle.domElement = el;
+      }
+
+      lane.push(vehicle);
+      this.analytics.totalGenerated++;
+      this.analytics.emergencyCount++;
+
+      const event = {
+        id: vehicle.id,
+        type: vehicle.type,
+        direction,
+        timestamp: Date.now(),
+        cleared: false
+      };
+      this.emergencyEvents.unshift(event);
+
+      if (this.onEmergencyRequest) {
+        this.onEmergencyRequest(direction, vehicle);
+      }
+
       return vehicle;
     }
 
@@ -386,6 +494,16 @@
                 );
               }
             }
+
+            // Check if emergency vehicle has safely cleared the intersection box
+            if (vehicle.isEmergency && !vehicle.hasClearedIntersection && vehicle.pos >= CONSTANTS.JUNCTION_EXIT) {
+              vehicle.hasClearedIntersection = true;
+              const ev = this.emergencyEvents.find((e) => e.id === vehicle.id);
+              if (ev) ev.cleared = true;
+              if (this.onEmergencyCleared) {
+                this.onEmergencyCleared(dir, vehicle);
+              }
+            }
           }
         }
 
@@ -424,8 +542,8 @@
         lane.forEach((v) => {
           if (!v.domElement) return;
           const { x, y, rotation } = v.getCanvasCoords();
-          // Center anchor transformation
-          v.domElement.style.transform = `translate(${x - CONSTANTS.CAR_WIDTH / 2}px, ${y - CONSTANTS.CAR_LENGTH / 2}px) rotate(${rotation}deg)`;
+          // Center anchor transformation using vehicle's specific dimensions
+          v.domElement.style.transform = `translate(${x - v.width / 2}px, ${y - v.length / 2}px) rotate(${rotation}deg)`;
         });
       });
     }
@@ -448,6 +566,8 @@
 
   VehicleManager.DENSITY_MODES = DENSITY_MODES;
   VehicleManager.DENSITY_CONFIGS = DENSITY_CONFIGS;
+  VehicleManager.VEHICLE_TYPES = VEHICLE_TYPES;
+  VehicleManager.VEHICLE_SPECS = VEHICLE_SPECS;
   VehicleManager.CONSTANTS = CONSTANTS;
   VehicleManager.Vehicle = Vehicle;
 

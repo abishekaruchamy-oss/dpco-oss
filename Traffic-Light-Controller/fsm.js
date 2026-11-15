@@ -110,6 +110,7 @@
       this.durations = { ...DEFAULT_DURATIONS, ...customDurations };
       this.currentState = STATES.S0_NS_GREEN;
       this.previousStateBeforeHalt = STATES.S0_NS_GREEN;
+      this.emergencyPriority = null;
       this.transitionCount = 0;
       this.history = [];
       this.maxHistoryLength = 50;
@@ -309,11 +310,85 @@
     }
 
     /**
+     * Request Emergency Vehicle Priority Preemption for a specific direction
+     * Safely transitions through yellow clearance if conflicting, or extends green if active.
+     * NEVER instantly switches conflicting green without yellow clearance!
+     * @param {string} direction 'north' | 'south' | 'east' | 'west'
+     * @returns {Object} Priority decision metadata
+     */
+    requestEmergencyPriority(direction) {
+      const validDirections = ['north', 'south', 'east', 'west'];
+      if (!validDirections.includes(direction)) {
+        throw new Error(`Invalid direction for emergency priority: ${direction}`);
+      }
+
+      const isNorthSouth = (direction === 'north' || direction === 'south');
+      const targetState = isNorthSouth ? STATES.S0_NS_GREEN : STATES.S2_EW_GREEN;
+      const conflictingGreenState = isNorthSouth ? STATES.S2_EW_GREEN : STATES.S0_NS_GREEN;
+
+      this.emergencyPriority = {
+        direction,
+        targetState,
+        active: true,
+        requestedAt: Date.now()
+      };
+
+      if (this.currentState === targetState) {
+        // Already green in emergency direction: hold and extend green
+        return {
+          status: 'ACTIVE_GREEN_EXTENDED',
+          action: 'HOLD',
+          targetState,
+          currentState: this.currentState
+        };
+      }
+
+      if (this.currentState === conflictingGreenState) {
+        // Conflicting direction is green: must trigger yellow clearance immediately!
+        // Never jump straight to opposing green!
+        return {
+          status: 'PREEMPT_TO_YELLOW',
+          action: 'CLEAR_CONFLICT',
+          targetState,
+          currentState: this.currentState
+        };
+      }
+
+      // If already in clearance state (S1 or S3), let clearance complete naturally to target green
+      return {
+        status: 'CLEARANCE_IN_PROGRESS',
+        action: 'WAIT_CLEARANCE',
+        targetState,
+        currentState: this.currentState
+      };
+    }
+
+    /**
+     * Clear emergency vehicle priority lock and return to standard operation
+     */
+    clearEmergencyPriority() {
+      const prev = this.emergencyPriority;
+      this.emergencyPriority = null;
+      return {
+        cleared: true,
+        previousRequest: prev
+      };
+    }
+
+    /**
+     * Get active emergency priority status
+     */
+    getEmergencyPriority() {
+      return this.emergencyPriority;
+    }
+
+    /**
      * Reset FSM to initial state S0 (NS Green / EW Red)
      */
     reset() {
       this.currentState = STATES.S0_NS_GREEN;
       this.previousStateBeforeHalt = STATES.S0_NS_GREEN;
+      this.emergencyPriority = null;
       this.transitionCount = 0;
       this.history = [];
       const safety = this.validateSafety();

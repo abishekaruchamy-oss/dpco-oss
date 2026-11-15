@@ -139,7 +139,28 @@ Every timing decision produces a human-interpretable rationale displayed directl
 
 ---
 
-## 6. Safety Invariant Proof & Fail-Safe Design
+## 6. Emergency Vehicle Priority Preemption (Phase 4)
+
+Provides dynamic, software-based priority preemption for emergency first responders while strictly enforcing yellow clearance safety invariants.
+
+### 6.1 Multi-Class Vehicle Representation
+| Vehicle Type | Dimensions | Top Speed | Visual Representation | Priority Level |
+|---|---|---|---|---|
+| **Compact Car** | $14 \times 26\text{px}$ | $70\text{ px/s}$ | Multi-color commuter sedans | Normal |
+| **Transit Bus** | $16 \times 36\text{px}$ | $60\text{ px/s}$ | Amber bus body with extended roof | Normal |
+| **Ambulance** | $16 \times 30\text{px}$ | $90\text{ px/s}$ | White medical chassis with emergency strobe | High Priority |
+| **Fire Engine** | $18 \times 36\text{px}$ | $88\text{ px/s}$ | Fire-red body with flashing emergency beacon | High Priority |
+| **Police Cruiser**| $14 \times 28\text{px}$ | $95\text{ px/s}$ | Navy interceptor with dual flashing lightbar | High Priority |
+
+### 6.2 Preemption Safety Protocols
+- **Never Instant Conflicting Green**: If an emergency vehicle arrives at a RED signal while the opposing axis is GREEN, the controller **never** abruptly cuts to opposing green. It transitions through the full $3\text{s}$ yellow clearance (`S1` or `S3`), ensures the intersection box is clear of crossing traffic, and then assigns GREEN to the emergency approach.
+- **Active Green Extension**: If the emergency vehicle approaches an already-GREEN signal, the green phase is held open until the emergency vehicle clears the intersection.
+- **Automatic Priority Release**: Once the emergency vehicle transits past the exit boundary (`pos >= 294px`), the priority lock is automatically released, returning to standard cyclic or adaptive operation.
+- **Operator Dispatch Toolbar**: On-demand dispatch buttons allow dispatching Ambulances, Fire Engines, or Police Cruisers from North, South, East, or West.
+
+---
+
+## 7. Safety Invariant Proof & Fail-Safe Design
 
 ### 5.1 Primary Safety Invariant
 > **Critical Requirement**: Conflicting directions must **NEVER** receive green simultaneously.
@@ -195,7 +216,7 @@ You can run the full verification suite directly from the terminal:
 node Traffic-Light-Controller/verify.js
 ```
 
-### Verification Assertions Tested (35/35 Passing):
+### Verification Assertions Tested (44/44 Passing):
 - **Phase 1 (FSM Core & Signals)**:
   - **Test 1**: Initial state is strictly $S0$ with North/South GREEN and East/West RED.
   - **Test 2**: Cyclic sequence fidelity ($S0 \to S1 \to S2 \to S3 \to S0$) over multiple cycles.
@@ -220,6 +241,12 @@ node Traffic-Light-Controller/verify.js
   - **Test 19**: Extreme traffic strictly clamped to $T_{\text{max}} = 25\text{s}$; zero demand truncated to $T_{\text{min}} = 5\text{s}$.
   - **Test 20**: Anti-starvation invariant boosts green time after consecutive low-allocation cycles.
   - **Test 21**: Yellow clearance (3s) remains inviolable under dynamic adaptive scaling.
+- **Phase 4 (Emergency Vehicle Priority Preemption)**:
+  - **Test 22**: Multi-class vehicle instantiation: Ambulance, Fire Engine, Police with proper dimensions and emergency flags.
+  - **Test 23**: Preemption safety: Conflicting green prompts yellow clearance, never instant conflicting switch.
+  - **Test 24**: Active green extension: Green held open while emergency vehicle approaches.
+  - **Test 25**: Priority release invariant: Priority lock released once emergency vehicle exits the junction.
+  - **Test 26**: Emergency event logging: Dispatch telemetries recorded in audit log with timestamps.
 
 ---
 
