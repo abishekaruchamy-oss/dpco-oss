@@ -26,12 +26,13 @@
     module.exports = factory(
       require('./fsm.js'),
       require('./vehicles.js'),
-      require('./adaptive.js')
+      require('./adaptive.js'),
+      require('./analytics.js')
     );
   } else {
-    root.FSMVerifier = factory(root.TrafficFSM, root.VehicleManager, root.AdaptiveController);
+    root.FSMVerifier = factory(root.TrafficFSM, root.VehicleManager, root.AdaptiveController, root.TrafficAnalyticsEngine);
   }
-})(typeof self !== 'undefined' ? self : this, function (TrafficLightFSM, VehicleManager, AdaptiveController) {
+})(typeof self !== 'undefined' ? self : this, function (TrafficLightFSM, VehicleManager, AdaptiveController, TrafficAnalyticsEngine) {
   'use strict';
 
   function runVerificationSuite() {
@@ -600,6 +601,72 @@
         emVm.emergencyEvents.length === 3 && emVm.analytics.emergencyCount === 3,
         'Emergency Event Telemetry: Events recorded in audit log with timestamps',
         `Dispatched count: ${emVm.analytics.emergencyCount}`
+      );
+    }
+
+    // =========================================================================
+    // PHASE 5 VERIFICATION (Advanced Traffic Analytics & Visualizations)
+    // =========================================================================
+    if (TrafficAnalyticsEngine) {
+      const ae = new TrafficAnalyticsEngine(20);
+
+      // --- TEST 27: Traffic Analytics Engine Snapshot Recording ---
+      const snap1 = ae.recordSnapshot({ north: 2, south: 1, east: 0, west: 1 }, 'ADAPTIVE', 18, 2.4);
+      assert(
+        snap1.total === 4 && snap1.ns === 3 && snap1.ew === 1 && ae.history.length === 1,
+        'Analytics Snapshot Data Model & Aggregation Integrity',
+        `Recorded Total: ${snap1.total}, NS: ${snap1.ns}, EW: ${snap1.ew}`
+      );
+
+      // --- TEST 28: Directional Approach Congestion Heatmap Computation ---
+      const heat = ae.getCongestionHeatLevels({ north: 6, south: 3, east: 0, west: 1 });
+      assert(
+        heat.north === 1.0 && heat.south === 0.5 && heat.east === 0.0 && heat.west > 0.1,
+        'Approach Congestion Heatmap: Heat normalized accurately across 0.0 to 1.0',
+        `N: ${heat.north}, S: ${heat.south}, E: ${heat.east}, W: ${heat.west.toFixed(2)}`
+      );
+
+      // --- TEST 29: Queue History Pure SVG Sparkline Generation ---
+      ae.recordSnapshot({ north: 3, south: 2, east: 1, west: 2 }, 'ADAPTIVE', 22, 3.1);
+      ae.recordSnapshot({ north: 1, south: 1, east: 3, west: 4 }, 'ADAPTIVE', 24, 2.8);
+      const svg = ae.generateQueueHistorySvg(320, 60);
+
+      assert(
+        typeof svg === 'string' && svg.includes('<svg') && svg.includes('<polyline') && svg.includes('stroke="#3b82f6"'),
+        'Pure SVG Queue History Sparkline Generation: Self-contained zero-dependency chart',
+        'Valid SVG elements rendered with NS/EW corridor series'
+      );
+
+      // --- TEST 30: Intersection Traffic Efficiency Score Calculation ---
+      const aeGood = new TrafficAnalyticsEngine();
+      aeGood.recordSnapshot({ north: 0, south: 0, east: 0, west: 0 }, 'ADAPTIVE', 30, 0.5);
+      const goodScore = aeGood.efficiencyScore;
+
+      const aeBad = new TrafficAnalyticsEngine();
+      aeBad.recordSnapshot({ north: 8, south: 8, east: 8, west: 8 }, 'ADAPTIVE', 8, 15.0);
+      const badScore = aeBad.efficiencyScore;
+
+      assert(
+        goodScore >= 90 && badScore <= 40 && badScore >= 15,
+        'Traffic Efficiency Score: Dynamic scoring responsive to delay and queue backlog',
+        `Clear conditions: ${goodScore}%, Congested conditions: ${badScore}%`
+      );
+
+      // --- TEST 31: Adaptive Timing Delay Savings Benchmark ---
+      assert(
+        ae.cumulativeAdaptiveDelaySaved > 0,
+        'Adaptive Timing Delay Savings Benchmark: Delay savings actively accumulated',
+        `Cumulative saved: ${ae.cumulativeAdaptiveDelaySaved.toFixed(1)}s`
+      );
+
+      // --- TEST 32: Emergency Preemption Response Clearance Analytics ---
+      ae.recordEmergencyClearance(8.5);
+      ae.recordEmergencyClearance(6.5);
+      const emStats = ae.getEmergencyStats();
+      assert(
+        emStats.totalCleared === 2 && emStats.avgClearanceTime === 7.5 && emStats.successRate === 100,
+        'Emergency Preemption Clearance Analytics: Mean transit duration and success rate verified',
+        `Cleared: ${emStats.totalCleared}, Mean Transit: ${emStats.avgClearanceTime}s, Success: ${emStats.successRate}%`
       );
     }
 

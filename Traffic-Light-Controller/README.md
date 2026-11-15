@@ -18,6 +18,7 @@ Traffic-Light-Controller/
 ├── fsm.js            # Pure Finite State Machine core, states, transitions & invariant logic
 ├── vehicles.js       # Vehicle physics, queue discipline, traffic density & analytics engine
 ├── adaptive.js       # Adaptive signal timing engine, demand modeling & XAI rationale
+├── analytics.js      # Advanced ITS analytics engine, pure SVG sparklines & heatmap
 ├── app.js            # Application controller: DOM bindings, countdown loop & 60fps render
 ├── verify.js         # Automated verification suite (runs in CLI and in-browser)
 └── README.md         # Architecture, FSM documentation, and verification proofs
@@ -160,7 +161,28 @@ Provides dynamic, software-based priority preemption for emergency first respond
 
 ---
 
-## 7. Safety Invariant Proof & Fail-Safe Design
+## 7. Advanced Traffic Analytics, Heatmap & SVG Sparklines (Phase 5)
+
+Provides deep ITS observability without relying on bulky external charting libraries (zero dependencies):
+
+### 7.1 Pure SVG Rolling Queue Timeline
+- Renders a lightweight, high-performance SVG line chart in real-time.
+- Simultaneously tracks the **North-South Corridor** (blue polyline) and **East-West Corridor** (pink polyline) across a 25-point rolling window.
+
+### 7.2 Approach Congestion Heatmap
+- 4-quadrant real-time approach visualizer mapping queue backlog:
+  - **CLEAR** (Cyan/Navy): $0\text{--}1$ vehicles in queue.
+  - **MODERATE** (Amber/Gold): $2\text{--}3$ vehicles in queue.
+  - **HEAVY** (Crimson/Red): $\ge 4$ vehicles in queue.
+
+### 7.3 Traffic Efficiency Score & Delay Savings
+- **Traffic Efficiency Score ($15\text{--}99\%$)**: Evaluates overall intersection operational health combining queue length penalties and waiting times.
+- **Adaptive Delay Saved**: Quantifies cumulative vehicle-seconds saved by dynamic green duration allocation compared to static fixed cycle baseline.
+- **Emergency Clearance Analytics**: Tracks total emergency priority transits, average transit duration, and clearance success rate.
+
+---
+
+## 8. Safety Invariant Proof & Fail-Safe Design
 
 ### 5.1 Primary Safety Invariant
 > **Critical Requirement**: Conflicting directions must **NEVER** receive green simultaneously.

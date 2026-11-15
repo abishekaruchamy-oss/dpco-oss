@@ -292,6 +292,14 @@
             <span class="kpi-label">Emergency Priority Cleared</span>
             <span id="statEmergencyCount" class="kpi-val highlight" style="color:#f43f5e;">0</span>
           </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Traffic Efficiency</span>
+            <span id="statEfficiencyScore" class="kpi-val efficiency">95%</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Adaptive Delay Saved</span>
+            <span id="statDelaySaved" class="kpi-val highlight">0.0s</span>
+          </div>
         </div>
         <div style="margin-top:0.6rem;">
           <span class="kpi-label">Current Queue Length by Approach:</span>
@@ -312,6 +320,43 @@
               <span class="q-dir">WEST</span>
               <span id="queueW" class="q-count">0</span>
             </div>
+          </div>
+        </div>
+
+        <!-- Approach Congestion Heatmap -->
+        <div style="margin-top:0.6rem;">
+          <span class="kpi-label">Approach Congestion Intensity Heatmap:</span>
+          <div class="heatmap-container">
+            <div id="heatNorth" class="heatmap-cell">
+              <span class="hm-dir">NORTH</span>
+              <span id="heatStatusNorth" class="hm-status">CLEAR</span>
+            </div>
+            <div id="heatSouth" class="heatmap-cell">
+              <span class="hm-dir">SOUTH</span>
+              <span id="heatStatusSouth" class="hm-status">CLEAR</span>
+            </div>
+            <div id="heatEast" class="heatmap-cell">
+              <span class="hm-dir">EAST</span>
+              <span id="heatStatusEast" class="hm-status">CLEAR</span>
+            </div>
+            <div id="heatWest" class="heatmap-cell">
+              <span class="hm-dir">WEST</span>
+              <span id="heatStatusWest" class="hm-status">CLEAR</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Queue History Timeline (Pure SVG Sparkline) -->
+        <div class="analytics-chart-container">
+          <div class="chart-header">
+            <span>Queue History (Rolling Timeline)</span>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-dot ns"></span> NS Corridor</span>
+              <span class="legend-item"><span class="legend-dot ew"></span> EW Corridor</span>
+            </div>
+          </div>
+          <div id="chartQueueHistory">
+            <!-- Dynamically rendered pure SVG -->
           </div>
         </div>
       </section>
@@ -373,6 +418,7 @@
   <script src="fsm.js"></script>
   <script src="vehicles.js"></script>
   <script src="adaptive.js"></script>
+  <script src="analytics.js"></script>
   <script src="verify.js"></script>
   <script src="app.js"></script>
 </body>

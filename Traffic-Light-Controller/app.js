@@ -18,6 +18,7 @@
   let fsm = null;
   let vehicleManager = null;
   let adaptiveController = null;
+  let analyticsEngine = null;
   let simStatus = SIM_STATUS.STOPPED;
   let timerInterval = null;
   let remainingSeconds = 10;
@@ -70,6 +71,21 @@
     statTotalPassed: document.getElementById('statTotalPassed'),
     statAvgWaitTime: document.getElementById('statAvgWaitTime'),
     statThroughput: document.getElementById('statThroughput'),
+    statEfficiencyScore: document.getElementById('statEfficiencyScore'),
+    statDelaySaved: document.getElementById('statDelaySaved'),
+    chartQueueHistory: document.getElementById('chartQueueHistory'),
+    heatCells: {
+      north: document.getElementById('heatNorth'),
+      south: document.getElementById('heatSouth'),
+      east: document.getElementById('heatEast'),
+      west: document.getElementById('heatWest')
+    },
+    heatStatuses: {
+      north: document.getElementById('heatStatusNorth'),
+      south: document.getElementById('heatStatusSouth'),
+      east: document.getElementById('heatStatusEast'),
+      west: document.getElementById('heatStatusWest')
+    },
     queueN: document.getElementById('queueN'),
     queueS: document.getElementById('queueS'),
     queueE: document.getElementById('queueE'),
@@ -173,6 +189,14 @@
   function handleEmergencyCleared(direction, vehicle) {
     fsm.clearEmergencyPriority();
 
+    if (analyticsEngine && vehicleManager) {
+      const ev = vehicleManager.emergencyEvents.find((e) => e.id === vehicle.id);
+      if (ev) {
+        const durationSec = Math.max(1, (Date.now() - ev.timestamp) / 1000);
+        analyticsEngine.recordEmergencyClearance(durationSec);
+      }
+    }
+
     if (elements.emergencyBanner) {
       elements.emergencyBanner.style.display = 'none';
     }
@@ -189,6 +213,10 @@
 
     if (window.AdaptiveController) {
       adaptiveController = new window.AdaptiveController();
+    }
+
+    if (window.TrafficAnalyticsEngine) {
+      analyticsEngine = new window.TrafficAnalyticsEngine();
     }
 
     if (window.VehicleManager) {
@@ -281,6 +309,52 @@
         if (elements.demandFillNS) elements.demandFillNS.style.width = `50%`;
         if (elements.demandFillEW) elements.demandFillEW.style.width = `50%`;
       }
+    }
+
+    // Phase 5: Advanced Traffic Analytics Engine Snapshot & Visualizations
+    if (analyticsEngine) {
+      analyticsEngine.recordSnapshot(
+        data.queueLengths,
+        adaptiveController ? adaptiveController.getMode() : 'ADAPTIVE',
+        data.throughput,
+        data.avgWaitTime
+      );
+
+      if (elements.statEfficiencyScore) {
+        elements.statEfficiencyScore.textContent = `${analyticsEngine.efficiencyScore}%`;
+      }
+      if (elements.statDelaySaved) {
+        elements.statDelaySaved.textContent = `${analyticsEngine.cumulativeAdaptiveDelaySaved.toFixed(1)}s`;
+      }
+      if (elements.chartQueueHistory) {
+        elements.chartQueueHistory.innerHTML = analyticsEngine.generateQueueHistorySvg(320, 60);
+      }
+
+      // Update Approach Congestion Heatmap
+      const heat = analyticsEngine.getCongestionHeatLevels(data.queueLengths);
+      ['north', 'south', 'east', 'west'].forEach((dir) => {
+        const cell = elements.heatCells[dir];
+        const statusEl = elements.heatStatuses[dir];
+        if (cell && statusEl) {
+          const lvl = heat[dir];
+          if (lvl >= 0.7) {
+            cell.style.background = '#450a0a';
+            cell.style.borderColor = '#ef4444';
+            statusEl.style.color = '#f87171';
+            statusEl.textContent = 'HEAVY';
+          } else if (lvl >= 0.35) {
+            cell.style.background = '#422006';
+            cell.style.borderColor = '#f59e0b';
+            statusEl.style.color = '#fbbf24';
+            statusEl.textContent = 'MODERATE';
+          } else {
+            cell.style.background = '#0f172a';
+            cell.style.borderColor = '#1e293b';
+            statusEl.style.color = '#38bdf8';
+            statusEl.textContent = 'CLEAR';
+          }
+        }
+      });
     }
   }
 
@@ -627,6 +701,10 @@
     if (vehicleManager) {
       vehicleManager.reset();
       updateAnalyticsUI();
+    }
+
+    if (analyticsEngine) {
+      analyticsEngine.reset();
     }
 
     const meta = fsm.getCurrentStateMetadata();

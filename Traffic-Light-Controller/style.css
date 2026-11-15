@@ -1364,6 +1364,89 @@ body {
 .rationale-box strong {
   color: #38bdf8;
 }
-  font-size: 0.8rem;
-  cursor: pointer;
+
+/* ==========================================================================
+   Phase 5: Advanced Traffic Analytics, Heatmap & SVG Sparklines
+   ========================================================================== */
+
+.analytics-chart-container {
+  background: #0d1322;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+.chart-legend {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.legend-dot.ns { background: #3b82f6; }
+.legend-dot.ew { background: #ec4899; }
+
+.analytics-chart-svg {
+  width: 100%;
+  height: 60px;
+  overflow: visible;
+}
+
+/* Directional Approach Heatmap */
+.heatmap-container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.heatmap-cell {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  padding: 0.4rem 0.2rem;
+  text-align: center;
+  font-family: var(--font-mono);
+  transition: all 0.3s ease;
+}
+
+.heatmap-cell .hm-dir {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+.heatmap-cell .hm-status {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #38bdf8;
+  margin-top: 0.15rem;
+}
+
+.kpi-val.efficiency {
+  color: #34d399;
 }
