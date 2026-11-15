@@ -245,6 +245,59 @@
     // Start 60fps vehicle animation loop
     lastAnimTime = performance.now();
     requestAnimationFrame(animationLoop);
+
+    // Check URL parameters for automated visual audit & headless testing
+    try {
+      if (typeof window !== 'undefined' && window.location && window.location.search) {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('density')) {
+          const d = urlParams.get('density').toUpperCase();
+          if (vehicleManager && ['LOW', 'MEDIUM', 'HIGH'].includes(d)) {
+            vehicleManager.setDensityMode(d);
+            if (elements.densitySelect) elements.densitySelect.value = d;
+          }
+        }
+        if (urlParams.get('mode')) {
+          const m = urlParams.get('mode').toUpperCase();
+          if (adaptiveController && ['ADAPTIVE', 'FIXED', 'MANUAL'].includes(m)) {
+            adaptiveController.setMode(m);
+            if (elements.modeSelect) elements.modeSelect.value = m;
+            updateAdaptiveUI();
+          }
+        }
+        if (urlParams.get('speed')) {
+          const s = parseFloat(urlParams.get('speed'));
+          if (!isNaN(s) && s > 0) {
+            speedMultiplier = s;
+            if (elements.speedSelect) elements.speedSelect.value = String(s);
+          }
+        }
+        if (urlParams.get('autostart') === 'true') {
+          startSimulation();
+        }
+        if (urlParams.get('ambulance')) {
+          setTimeout(() => {
+            if (vehicleManager) {
+              vehicleManager.spawnEmergencyVehicle(urlParams.get('ambulance'), 'AMBULANCE');
+            }
+          }, 400);
+        }
+        if (urlParams.get('ambulance_cleared')) {
+          setTimeout(() => {
+            if (vehicleManager) {
+              const veh = vehicleManager.spawnEmergencyVehicle('north', 'AMBULANCE');
+              if (veh) {
+                veh.pos = 320;
+                veh.hasClearedIntersection = true;
+                handleEmergencyCleared('north', veh);
+              }
+            }
+          }, 400);
+        }
+      }
+    } catch (e) {
+      // Fallback
+    }
   }
 
   /**
@@ -266,6 +319,39 @@
   }
 
   /**
+   * Update Adaptive Demand Meter, Progress Bar, Rationale & XAI from authoritative snapshot
+   */
+  function updateAdaptiveUI(queues = null) {
+    if (!adaptiveController || !vehicleManager) return;
+    const currentQueues = queues || vehicleManager.getAnalytics().queueLengths;
+    const currentState = fsm ? fsm.getCurrentState() : window.TrafficFSM.STATES.S0_NS_GREEN;
+
+    // Single authoritative evaluation snapshot
+    const evalData = adaptiveController.getLiveDemandEvaluation(currentState, currentQueues);
+
+    if (elements.valDemandNS) elements.valDemandNS.textContent = evalData.demandNS.toFixed(1);
+    if (elements.valDemandEW) elements.valDemandEW.textContent = evalData.demandEW.toFixed(1);
+
+    const totalD = evalData.demandNS + evalData.demandEW;
+    if (totalD > 0) {
+      const nsPct = Math.round((evalData.demandNS / totalD) * 100);
+      const ewPct = 100 - nsPct;
+      if (elements.demandFillNS) elements.demandFillNS.style.width = `${nsPct}%`;
+      if (elements.demandFillEW) elements.demandFillEW.style.width = `${ewPct}%`;
+    } else {
+      if (elements.demandFillNS) elements.demandFillNS.style.width = '50%';
+      if (elements.demandFillEW) elements.demandFillEW.style.width = '50%';
+    }
+
+    if (elements.adaptiveRationaleText) {
+      elements.adaptiveRationaleText.textContent = evalData.rationale;
+    }
+    if (elements.adaptiveCalculatedDuration) {
+      elements.adaptiveCalculatedDuration.textContent = `${evalData.duration}s (${evalData.axis})`;
+    }
+  }
+
+  /**
    * Update Traffic Analytics UI KPI Badges
    */
   function updateAnalyticsUI() {
@@ -275,8 +361,19 @@
     if (elements.statTotalGenerated) elements.statTotalGenerated.textContent = data.totalGenerated;
     if (elements.statTotalPassed) elements.statTotalPassed.textContent = data.totalPassed;
     if (elements.statAvgWaitTime) elements.statAvgWaitTime.textContent = `${data.avgWaitTime.toFixed(1)}s`;
-    if (elements.statThroughput) elements.statThroughput.textContent = `${data.throughput} veh/min`;
-    if (elements.statEmergencyCount) elements.statEmergencyCount.textContent = data.emergencyCount || 0;
+    if (elements.statThroughput) {
+      if (data.totalPassed === 0 && data.totalGenerated > 0) {
+        elements.statThroughput.textContent = 'Flow Inbound...';
+      } else {
+        elements.statThroughput.textContent = `${data.throughput} veh/min`;
+      }
+    }
+    if (elements.statEmergencyCount) {
+      const clearedCount = analyticsEngine
+        ? analyticsEngine.getEmergencyMetrics().totalCleared
+        : (vehicleManager ? vehicleManager.emergencyEvents.filter(e => e.cleared).length : 0);
+      elements.statEmergencyCount.textContent = clearedCount;
+    }
 
     if (elements.queueN) elements.queueN.textContent = data.queueLengths.north;
     if (elements.queueS) elements.queueS.textContent = data.queueLengths.south;
@@ -295,23 +392,8 @@
       }
     });
 
-    // Update real-time Adaptive Demand Meter
-    if (adaptiveController && vehicleManager) {
-      const demandData = adaptiveController.analyzeTrafficDemand(data.queueLengths);
-      if (elements.valDemandNS) elements.valDemandNS.textContent = demandData.demandNS.toFixed(1);
-      if (elements.valDemandEW) elements.valDemandEW.textContent = demandData.demandEW.toFixed(1);
-
-      const totalD = demandData.demandNS + demandData.demandEW;
-      if (totalD > 0) {
-        const nsPct = Math.round((demandData.demandNS / totalD) * 100);
-        const ewPct = 100 - nsPct;
-        if (elements.demandFillNS) elements.demandFillNS.style.width = `${nsPct}%`;
-        if (elements.demandFillEW) elements.demandFillEW.style.width = `${ewPct}%`;
-      } else {
-        if (elements.demandFillNS) elements.demandFillNS.style.width = `50%`;
-        if (elements.demandFillEW) elements.demandFillEW.style.width = `50%`;
-      }
-    }
+    // Authoritative Single-Snapshot Adaptive Demand & XAI Update
+    updateAdaptiveUI(data.queueLengths);
 
     // Phase 5: Advanced Traffic Analytics Engine Snapshot & Visualizations
     if (analyticsEngine) {
@@ -436,7 +518,14 @@
       }
 
       // Update countdown display
-      elements.timers[dir].textContent = remainingSeconds;
+      const isPriorityHold = (fsm.isHoldingPriorityGreen && fsm.isHoldingPriorityGreen());
+      if (isPriorityHold) {
+        elements.timers[dir].textContent = 'HOLD';
+        elements.timers[dir].classList.add('priority-hold');
+      } else {
+        elements.timers[dir].textContent = remainingSeconds;
+        elements.timers[dir].classList.remove('priority-hold');
+      }
     });
 
     // Update traffic flow indicators
@@ -447,54 +536,58 @@
     const ewCaution = !isAllRed && signals.east === window.TrafficFSM.LIGHTS.YELLOW;
 
     if (isAllRed) {
-      elements.flowNS.className = 'flow-indicator flow-ns flow-stopped';
-      elements.flowNS.style.background = 'rgba(239, 68, 68, 0.4)';
-      elements.flowNS.textContent = 'ALL-RED HALT';
+      elements.flowNS.className = 'flow-pill flow-stopped';
+      elements.flowNS.style.background = '';
+      elements.flowNS.style.color = '';
+      elements.flowNS.style.border = '';
+      elements.flowNS.textContent = 'NS: ALL-RED';
 
-      elements.flowEW.className = 'flow-indicator flow-ew flow-stopped';
-      elements.flowEW.style.background = 'rgba(239, 68, 68, 0.4)';
-      elements.flowEW.textContent = 'ALL-RED HALT';
+      elements.flowEW.className = 'flow-pill flow-stopped';
+      elements.flowEW.style.background = '';
+      elements.flowEW.style.color = '';
+      elements.flowEW.style.border = '';
+      elements.flowEW.textContent = 'EW: ALL-RED';
       return;
     }
 
     if (nsActive) {
-      elements.flowNS.className = 'flow-indicator flow-ns flow-active';
+      elements.flowNS.className = 'flow-pill flow-active';
       elements.flowNS.style.background = '';
       elements.flowNS.style.color = '';
       elements.flowNS.style.border = '';
-      elements.flowNS.textContent = 'NS FLOWING (GREEN)';
+      elements.flowNS.textContent = 'NS: FLOWING (GREEN)';
     } else if (nsCaution) {
-      elements.flowNS.className = 'flow-indicator flow-ns';
-      elements.flowNS.style.background = 'rgba(245, 158, 11, 0.25)';
-      elements.flowNS.style.color = '#fbbf24';
-      elements.flowNS.style.border = '1px solid #f59e0b';
-      elements.flowNS.textContent = 'NS CLEARING (YELLOW)';
-    } else {
-      elements.flowNS.className = 'flow-indicator flow-ns flow-stopped';
+      elements.flowNS.className = 'flow-pill flow-caution';
       elements.flowNS.style.background = '';
       elements.flowNS.style.color = '';
       elements.flowNS.style.border = '';
-      elements.flowNS.textContent = 'NS STOPPED (RED)';
+      elements.flowNS.textContent = 'NS: CLEARING (YELLOW)';
+    } else {
+      elements.flowNS.className = 'flow-pill flow-stopped';
+      elements.flowNS.style.background = '';
+      elements.flowNS.style.color = '';
+      elements.flowNS.style.border = '';
+      elements.flowNS.textContent = 'NS: STOPPED (RED)';
     }
 
     if (ewActive) {
-      elements.flowEW.className = 'flow-indicator flow-ew flow-active';
+      elements.flowEW.className = 'flow-pill flow-active';
       elements.flowEW.style.background = '';
       elements.flowEW.style.color = '';
       elements.flowEW.style.border = '';
-      elements.flowEW.textContent = 'EW FLOWING (GREEN)';
+      elements.flowEW.textContent = 'EW: FLOWING (GREEN)';
     } else if (ewCaution) {
-      elements.flowEW.className = 'flow-indicator flow-ew';
-      elements.flowEW.style.background = 'rgba(245, 158, 11, 0.25)';
-      elements.flowEW.style.color = '#fbbf24';
-      elements.flowEW.style.border = '1px solid #f59e0b';
-      elements.flowEW.textContent = 'EW CLEARING (YELLOW)';
-    } else {
-      elements.flowEW.className = 'flow-indicator flow-ew flow-stopped';
+      elements.flowEW.className = 'flow-pill flow-caution';
       elements.flowEW.style.background = '';
       elements.flowEW.style.color = '';
       elements.flowEW.style.border = '';
-      elements.flowEW.textContent = 'EW STOPPED (RED)';
+      elements.flowEW.textContent = 'EW: CLEARING (YELLOW)';
+    } else {
+      elements.flowEW.className = 'flow-pill flow-stopped';
+      elements.flowEW.style.background = '';
+      elements.flowEW.style.color = '';
+      elements.flowEW.style.border = '';
+      elements.flowEW.textContent = 'EW: STOPPED (RED)';
     }
   }
 
@@ -550,12 +643,14 @@
     // Update Signals
     updateSignalsUI(signals);
 
+    const isPriorityHold = !!(fsm.isHoldingPriorityGreen && fsm.isHoldingPriorityGreen());
+
     // Update State Card
     if (fsm.isAllRedHalt()) {
       elements.stateTitle.textContent = 'FAIL-SAFE: ALL-RED HALT';
       elements.stateIdBadge.textContent = 'Emergency Mode';
       elements.stateDesc.textContent = 'All approaches are held at RED. Vehicles stop safely at stop lines.';
-      elements.activeAxisLabel.textContent = 'Active Axis: None (All Red)';
+      elements.activeAxisLabel.textContent = 'Active: None (All Red)';
       elements.countdownSeconds.textContent = 'HOLD';
       elements.elapsedSeconds.textContent = `${elapsedSeconds}s`;
       elements.progressBarFill.style.width = '100%';
@@ -565,11 +660,15 @@
       elements.stateTitle.textContent = `${meta.code}: ${meta.title}`;
       elements.stateIdBadge.textContent = `Phase ${meta.id + 1} of 4`;
       elements.stateDesc.textContent = meta.description;
-      elements.activeAxisLabel.textContent = `Active Axis: ${meta.axisActive}`;
-      elements.countdownSeconds.textContent = `${remainingSeconds}s`;
+      elements.activeAxisLabel.textContent = `Active: ${meta.axisActive}`;
+      if (isPriorityHold) {
+        elements.countdownSeconds.innerHTML = '<span class="priority-hold-label">HOLD</span>';
+      } else {
+        elements.countdownSeconds.textContent = `${remainingSeconds}s`;
+      }
       elements.elapsedSeconds.textContent = `${elapsedSeconds}s`;
       const totalDuration = meta.duration || 10;
-      const percentage = Math.max(0, Math.min(100, (remainingSeconds / totalDuration) * 100));
+      const percentage = isPriorityHold ? 100 : Math.max(0, Math.min(100, (remainingSeconds / totalDuration) * 100));
       elements.progressBarFill.style.width = `${percentage}%`;
       elements.btnAllRed.classList.remove('active');
       elements.btnAllRed.innerHTML = '<span aria-hidden="true">&#9888;</span> All-Red Halt';
@@ -592,10 +691,24 @@
         elements.emergencyBanner.style.display = 'flex';
         const isNorthSouth = priority.direction === 'north' || priority.direction === 'south';
         const targetState = isNorthSouth ? window.TrafficFSM.STATES.S0_NS_GREEN : window.TrafficFSM.STATES.S2_EW_GREEN;
+
+        const dirLane = vehicleManager ? vehicleManager.lanes[priority.direction] : [];
+        const activeVeh = dirLane ? dirLane.find(v => v.isEmergency && !v.hasClearedIntersection) : null;
+        const isCrossing = activeVeh && activeVeh.pos >= 138;
+
+        if (elements.emergencyBannerText) {
+          const typeLabel = activeVeh ? activeVeh.type.replace('_', ' ') : 'EMERGENCY VEHICLE';
+          elements.emergencyBannerText.textContent = `${typeLabel} from ${priority.direction.toUpperCase()}`;
+        }
+
         if (fsm.isAllRedHalt()) {
           elements.emergencyBannerPhase.textContent = 'All-Red Emergency Override';
         } else if (fsm.getCurrentState() === targetState) {
-          elements.emergencyBannerPhase.textContent = 'Priority Green Active (Holding for Transit)';
+          if (isCrossing) {
+            elements.emergencyBannerPhase.textContent = 'Priority Green Active (Traversing Intersection Box)';
+          } else {
+            elements.emergencyBannerPhase.textContent = 'Priority Green Active (Holding for Transit)';
+          }
         } else {
           elements.emergencyBannerPhase.textContent = 'Securing Yellow Clearance...';
         }
@@ -605,6 +718,9 @@
         elements.emergencyBanner.style.display = 'none';
       }
     }
+
+    // Keep Adaptive UI synchronized with authoritative snapshot
+    updateAdaptiveUI();
 
     // Status Badge
     updateStatusBadge();
@@ -646,6 +762,7 @@
 
     // If an emergency vehicle has secured priority green, hold green open until transit is complete
     if (fsm.isHoldingPriorityGreen && fsm.isHoldingPriorityGreen()) {
+      elapsedSeconds++;
       if (remainingSeconds < 5) {
         remainingSeconds = 5;
       }
@@ -675,8 +792,7 @@
             logEvent(`Adaptive Control [${decision.axis}]: Green calculated at ${decision.duration}s. Reason: ${decision.rationale}`);
           }
 
-          if (elements.adaptiveRationaleText) elements.adaptiveRationaleText.textContent = decision.rationale;
-          if (elements.adaptiveCalculatedDuration) elements.adaptiveCalculatedDuration.textContent = `${decision.duration}s (${decision.axis})`;
+          updateAdaptiveUI(queues);
         }
       }
 
@@ -868,12 +984,7 @@
         const mode = e.target.value;
         if (adaptiveController) {
           adaptiveController.setMode(mode);
-          const decision = adaptiveController.evaluatePhaseDuration(
-            fsm.getCurrentState(),
-            vehicleManager ? vehicleManager.getAnalytics().queueLengths : {}
-          );
-          if (elements.adaptiveRationaleText) elements.adaptiveRationaleText.textContent = decision.rationale;
-          if (elements.adaptiveCalculatedDuration) elements.adaptiveCalculatedDuration.textContent = `${decision.duration}s (${mode})`;
+          updateAdaptiveUI();
         }
         if (elements.adaptiveModeBadge) {
           elements.adaptiveModeBadge.textContent = `${mode} MODE`;

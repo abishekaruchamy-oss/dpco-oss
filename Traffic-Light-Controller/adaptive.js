@@ -113,14 +113,14 @@
     }
 
     /**
-     * Compute adaptive green duration for the upcoming active phase
-     * @param {string} stateKey S0_NS_GREEN or S2_EW_GREEN
+     * Get live demand evaluation and rationale without advancing cycle/starvation state
+     * @param {string} stateKey S0_NS_GREEN, S1_NS_YELLOW, S2_EW_GREEN, S3_EW_YELLOW
      * @param {Object} queues { north, south, east, west }
      * @param {Object} [approaching] { north, south, east, west }
-     * @returns {Object} { duration, rationale, demandNS, demandEW, mode }
+     * @returns {Object} Authoritative snapshot: { axis, duration, rationale, demandNS, demandEW, dominantAxis, congestionLevel, mode }
      */
-    evaluatePhaseDuration(stateKey, queues, approaching = null) {
-      const isNorthSouth = (stateKey === TrafficLightFSM.STATES.S0_NS_GREEN);
+    getLiveDemandEvaluation(stateKey, queues, approaching = null) {
+      const isNorthSouth = (stateKey === TrafficLightFSM.STATES.S0_NS_GREEN || stateKey === TrafficLightFSM.STATES.S1_NS_YELLOW);
       const axisName = isNorthSouth ? 'North-South' : 'East-West';
       const opposingAxisName = isNorthSouth ? 'East-West' : 'North-South';
 
@@ -130,76 +130,61 @@
 
       // Handle FIXED mode
       if (this.mode === MODES.FIXED) {
-        const decision = {
+        return {
           axis: axisName,
           duration: this.config.baseGreen,
           rationale: `Fixed Timing Mode: Static nominal duration (${this.config.baseGreen}s) allocated regardless of queue density.`,
           demandNS: analysis.demandNS,
           demandEW: analysis.demandEW,
+          dominantAxis: analysis.dominantAxis,
+          congestionLevel: analysis.congestionLevel,
           mode: this.mode,
           timestamp: Date.now()
         };
-        this.lastDecision = decision;
-        return decision;
       }
 
       // Handle MANUAL mode
       if (this.mode === MODES.MANUAL) {
-        const decision = {
+        return {
           axis: axisName,
           duration: this.config.baseGreen,
           rationale: `Manual Timing Mode: User-configured duration table active.`,
           demandNS: analysis.demandNS,
           demandEW: analysis.demandEW,
+          dominantAxis: analysis.dominantAxis,
+          congestionLevel: analysis.congestionLevel,
           mode: this.mode,
           timestamp: Date.now()
         };
-        this.lastDecision = decision;
-        return decision;
       }
 
       // Handle ADAPTIVE mode
       let computedDuration = this.config.baseGreen;
       let rationale = '';
 
-      // Check anti-starvation condition
       if (this.consecutiveMinCycles[axisName] >= 2 && activeDemand > 0) {
         computedDuration = Math.min(this.config.maxGreen, this.config.baseGreen + 4);
         rationale = `Anti-starvation safeguard triggered for ${axisName} (held at min for consecutive cycles). Duration increased to ${computedDuration}s to guarantee fair throughput.`;
-        this.consecutiveMinCycles[axisName] = 0;
       } else if (activeDemand === 0 && opposingDemand > 0) {
-        // Zero demand on active approach: cut green to minimum to expedite rotation to congested approach
         computedDuration = this.config.minGreen;
-        this.consecutiveMinCycles[axisName]++;
         rationale = `Zero queued vehicles detected on ${axisName}. Green truncated to minimum threshold (${this.config.minGreen}s) to expedite clearance for ${opposingAxisName} (${opposingDemand.toFixed(1)} demand).`;
       } else if (activeDemand > opposingDemand + 0.5) {
-        // Active corridor is significantly more congested
         const demandDelta = activeDemand - opposingDemand;
         const additionalSeconds = Math.round(demandDelta * this.config.secondsPerQueuedCar);
         computedDuration = Math.min(this.config.maxGreen, this.config.baseGreen + additionalSeconds);
-        this.consecutiveMinCycles[axisName] = 0;
         rationale = `${axisName} traffic demand (${activeDemand.toFixed(1)}) exceeds ${opposingAxisName} (${opposingDemand.toFixed(1)}). Green extended to ${computedDuration}s (+${additionalSeconds}s) to disperse queue.`;
       } else if (opposingDemand > activeDemand + 1.5) {
-        // Opposing corridor is heavily congested compared to active corridor
         const reductionSeconds = Math.round((opposingDemand - activeDemand) * 1.2);
         computedDuration = Math.max(this.config.minGreen, this.config.baseGreen - reductionSeconds);
-        if (computedDuration === this.config.minGreen) {
-          this.consecutiveMinCycles[axisName]++;
-        } else {
-          this.consecutiveMinCycles[axisName] = 0;
-        }
         rationale = `${opposingAxisName} has heavy queue backlog (${opposingDemand.toFixed(1)} vs ${activeDemand.toFixed(1)}). ${axisName} green reduced to ${computedDuration}s to grant cross-street priority sooner.`;
       } else {
-        // Balanced traffic demand
         computedDuration = this.config.baseGreen;
-        this.consecutiveMinCycles[axisName] = 0;
         rationale = `Demand is balanced (${axisName}: ${activeDemand.toFixed(1)}, ${opposingAxisName}: ${opposingDemand.toFixed(1)}). Standard nominal green duration (${computedDuration}s) assigned.`;
       }
 
-      // Hard safety clamping strictly within configured bounds
       computedDuration = Math.max(this.config.minGreen, Math.min(this.config.maxGreen, computedDuration));
 
-      const decision = {
+      return {
         axis: axisName,
         duration: computedDuration,
         rationale,
@@ -210,6 +195,34 @@
         mode: this.mode,
         timestamp: Date.now()
       };
+    }
+
+    /**
+     * Compute adaptive green duration for the upcoming active phase
+     * @param {string} stateKey S0_NS_GREEN or S2_EW_GREEN
+     * @param {Object} queues { north, south, east, west }
+     * @param {Object} [approaching] { north, south, east, west }
+     * @returns {Object} { duration, rationale, demandNS, demandEW, mode }
+     */
+    evaluatePhaseDuration(stateKey, queues, approaching = null) {
+      const decision = this.getLiveDemandEvaluation(stateKey, queues, approaching);
+      const isNorthSouth = (stateKey === TrafficLightFSM.STATES.S0_NS_GREEN);
+      const axisName = isNorthSouth ? 'North-South' : 'East-West';
+
+      if (this.mode === MODES.ADAPTIVE) {
+        const activeDemand = isNorthSouth ? decision.demandNS : decision.demandEW;
+        const opposingDemand = isNorthSouth ? decision.demandEW : decision.demandNS;
+
+        if (this.consecutiveMinCycles[axisName] >= 2 && activeDemand > 0) {
+          this.consecutiveMinCycles[axisName] = 0;
+        } else if (activeDemand === 0 && opposingDemand > 0) {
+          this.consecutiveMinCycles[axisName]++;
+        } else if (opposingDemand > activeDemand + 1.5 && decision.duration === this.config.minGreen) {
+          this.consecutiveMinCycles[axisName]++;
+        } else {
+          this.consecutiveMinCycles[axisName] = 0;
+        }
+      }
 
       this.lastDecision = decision;
       return decision;

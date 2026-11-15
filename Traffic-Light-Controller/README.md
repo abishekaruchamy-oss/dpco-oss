@@ -20,7 +20,7 @@ Traffic-Light-Controller/
 ├── adaptive.js       # Adaptive signal timing engine, demand modeling & XAI rationale
 ├── analytics.js      # Advanced ITS analytics engine, pure SVG sparklines & heatmap
 ├── app.js            # Application controller: DOM bindings, countdown loop & 60fps render
-├── verify.js         # Automated verification suite (68 formal assertions, CLI and in-browser)
+├── verify.js         # Automated verification suite (72 formal assertions, CLI and in-browser)
 ├── README.md         # Architecture, FSM documentation, and verification proofs
 └── docs/             # Comprehensive documentation suite
     ├── project-overview.md        # Architectural overview, dataflow & design principles
@@ -30,7 +30,10 @@ Traffic-Light-Controller/
     ├── user-guide.md              # End-user operator manual, controls & dashboard guide
     ├── final-audit-report.md      # Independent quality assurance & formal audit report
     ├── phase-7-investigation.md   # Phase 7 defect investigation & kinematic root causes
-    └── phase-7-remediation-report.md # Phase 7 remediation report & 18-scenario verification proofs
+    ├── phase-7-remediation-report.md # Phase 7 remediation report & 18-scenario verification proofs
+    ├── phase-8-visual-audit.md    # Phase 8 visual and UX defect audit
+    ├── phase-8-remediation-report.md # Phase 8 remediation report & balanced UI architecture
+    └── phase-8-evidence/          # Phase 8 headless browser screenshot evidence (10 images)
 ```
 
 ---
@@ -49,6 +52,8 @@ For exhaustive technical references, inspect the dedicated documentation manuals
 | **Final Audit Report** | [`docs/final-audit-report.md`](./docs/final-audit-report.md) | Independent QA validation, 12 edge-case stress results, safety proofs, and readiness assessment. |
 | **Phase 7 Investigation** | [`docs/phase-7-investigation.md`](./docs/phase-7-investigation.md) | Diagnostic analysis and root-cause breakdown of 6 simulation defects (DEF-P7-01 to DEF-P7-06). |
 | **Phase 7 Remediation** | [`docs/phase-7-remediation-report.md`](./docs/phase-7-remediation-report.md) | Remediation report, architecture updates, and verification results across all 18 operational scenarios. |
+| **Phase 8 Visual Audit** | [`docs/phase-8-visual-audit.md`](./docs/phase-8-visual-audit.md) | Visual UI audit, UI/UX defect analysis (DEF-UI-01 through DEF-UI-07), and baseline screenshots. |
+| **Phase 8 Remediation** | [`docs/phase-8-remediation-report.md`](./docs/phase-8-remediation-report.md) | Balanced dashboard architecture, authoritative demand snapshot, crosswalk geometry, and 10 screenshot proofs. |
 
 ---
 
@@ -251,7 +256,7 @@ You can run the full verification suite directly from the terminal:
 node Traffic-Light-Controller/verify.js
 ```
 
-### Full Assertion Audit (68/68 Passing):
+### Full Assertion Audit (72/72 Passing):
 - **Phase 1 (FSM Core & Signals)**:
   - **Test 1**: Initial state is strictly $S0$ with North/South GREEN and East/West RED.
   - **Test 2**: Cyclic sequence fidelity ($S0 \to S1 \to S2 \to S3 \to S0$) over multiple cycles.
@@ -308,6 +313,11 @@ node Traffic-Light-Controller/verify.js
   - **Test 48**: Scenario 16: Dynamic mode switching between ADAPTIVE, FIXED, and MANUAL operates seamlessly.
   - **Test 49**: Scenario 17: Vehicle conservation invariant holds continuously: Total Generated = Passed + Active.
   - **Test 50**: Scenario 18: Long-duration continuous operation avoids unbounded memory growth and frozen vehicles.
+- **Phase 8 (Visual Audit, UI Synchronization & Crosswalk Invariants)**:
+  - **Test 51**: Authoritative demand snapshot evaluation: `getLiveDemandEvaluation` is zero-side-effect and mathematically consistent.
+  - **Test 52**: Explainable AI (XAI) rationale synchronization across `ADAPTIVE`, `FIXED`, and `MANUAL` modes.
+  - **Test 53**: Emergency priority green hold active during transit and safely released post-clearance without conflict.
+  - **Test 54**: Spatial boundary invariant: Stopped vehicles halt strictly at stop line ($138\text{px}$) maintaining clearance from pedestrian crosswalks ($154\text{px}$).
 
 ---
 

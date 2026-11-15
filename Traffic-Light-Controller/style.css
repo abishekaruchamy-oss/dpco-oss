@@ -268,11 +268,18 @@ body {
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1.25fr 1fr;
-  gap: 1rem;
+  gap: 1.25rem;
   flex: 1;
 }
 
-@media (max-width: 1024px) {
+.dashboard-col-left,
+.dashboard-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+@media (max-width: 1100px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
@@ -471,19 +478,19 @@ body {
   z-index: 4;
 }
 
-/* Zebra Crossings */
+/* Zebra Crossings - Positioned at intersection throat (DEF-UI-05) */
 .crosswalk {
   position: absolute;
   z-index: 3;
   display: flex;
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
 .crosswalk-north {
-  top: 132px;
+  top: 154px;
   left: calc(50% - 68px);
   width: 136px;
-  height: 14px;
+  height: 12px;
   background: repeating-linear-gradient(
     90deg,
     var(--road-marking),
@@ -494,10 +501,10 @@ body {
 }
 
 .crosswalk-south {
-  bottom: 132px;
+  bottom: 154px;
   left: calc(50% - 68px);
   width: 136px;
-  height: 14px;
+  height: 12px;
   background: repeating-linear-gradient(
     90deg,
     var(--road-marking),
@@ -508,9 +515,9 @@ body {
 }
 
 .crosswalk-west {
-  left: 132px;
+  left: 154px;
   top: calc(50% - 68px);
-  width: 14px;
+  width: 12px;
   height: 136px;
   background: repeating-linear-gradient(
     0deg,
@@ -522,9 +529,9 @@ body {
 }
 
 .crosswalk-east {
-  right: 132px;
+  right: 154px;
   top: calc(50% - 68px);
-  width: 14px;
+  width: 12px;
   height: 136px;
   background: repeating-linear-gradient(
     0deg,
@@ -577,6 +584,29 @@ body {
   padding: 1px 5px;
   min-width: 24px;
   text-align: center;
+  transition: all 0.2s ease;
+}
+
+.signal-countdown.priority-hold {
+  background: #7f1d1d !important;
+  color: #fca5a5 !important;
+  border-color: #ef4444 !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.04em;
+  animation: pulse-danger 0.7s infinite alternate;
+}
+
+.priority-hold-label {
+  display: inline-block;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  margin-left: 0.5rem;
+  animation: pulse-danger 0.7s infinite alternate;
 }
 
 /* Signal Lamp Housing */
@@ -652,40 +682,52 @@ body {
   right: 36px;
 }
 
-/* Traffic Flow Animation Indicators */
-.flow-indicator {
-  position: absolute;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 2px 6px;
-  border-radius: 4px;
-  z-index: 5;
+/* Junction Header Corridor Flow Status Pills (DEF-UI-04) */
+.junction-header-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.flow-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
   font-family: var(--font-mono);
-  transition: all 0.2s ease;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--border-color);
+  background: #0f172a;
+  color: var(--text-muted);
+  transition: all 0.25s ease;
 }
 
-.flow-ns {
-  left: calc(50% + 15px);
-  top: 195px;
-}
-
-.flow-ew {
-  top: calc(50% + 15px);
-  left: 195px;
-}
-
-.flow-active {
-  background: rgba(16, 185, 129, 0.25);
+.flow-pill.flow-active {
+  background: rgba(16, 185, 129, 0.2);
   color: #34d399;
-  border: 1px solid #10b981;
+  border-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.25);
 }
 
-.flow-stopped {
-  background: rgba(239, 68, 68, 0.25);
+.flow-pill.flow-stopped {
+  background: rgba(239, 68, 68, 0.18);
   color: #f87171;
-  border: 1px solid #ef4444;
+  border-color: #ef4444;
+}
+
+.flow-pill.flow-caution {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border-color: #f59e0b;
+}
+
+/* Legacy flow indicator class support */
+.flow-indicator {
+  display: none;
 }
 
 /* Right-Side Dashboard Details */
@@ -1448,4 +1490,74 @@ body {
 
 .kpi-val.efficiency {
   color: #34d399;
+}
+
+/* ==========================================================================
+   Responsive Viewport Refinements (Phase 8 - DEF-UI-07)
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  body {
+    padding: 0.5rem;
+  }
+
+  .app-header {
+    padding: 0.85rem 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .control-bar {
+    padding: 0.75rem 1rem;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .control-group {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .panel-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .junction-header-status {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .flow-pill {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.5rem;
+  }
+
+  .junction-container {
+    min-height: 340px;
+    padding: 0.5rem;
+    overflow: hidden;
+  }
+
+  .intersection {
+    transform: scale(0.68);
+    transform-origin: center center;
+    margin: -60px auto;
+  }
+
+  .heatmap-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .queue-row {
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-size: 0.75rem;
+    padding: 0.45rem 0.75rem;
+  }
 }

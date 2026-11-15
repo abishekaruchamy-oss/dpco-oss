@@ -88,121 +88,187 @@
     </div>
   </section>
 
-  <!-- Main Content Grid -->
+  <!-- Main Content Grid: Balanced 2-Column ITS Layout -->
   <main class="dashboard-grid">
-    <!-- Left: 4-Way Traffic Junction Visualization -->
-    <section class="panel" aria-label="Traffic Junction View">
-      <div class="panel-header">
-        <h2>
-          <span>&#9680;</span> 4-Way Traffic Junction
-        </h2>
-        <span id="activeAxisLabel" class="state-axis">Active Axis: North-South</span>
-      </div>
-
-      <!-- Emergency Preemption Alert Banner -->
-      <div id="emergencyBanner" class="emergency-banner" style="display:none; margin-bottom:0.75rem;">
-        <span>🚨 <strong>EMERGENCY PREEMPTION:</strong> <span id="emergencyBannerText">Ambulance Approaching</span></span>
-        <span id="emergencyBannerPhase" style="font-family:var(--font-mono); font-size:0.75rem;">Securing Clearance...</span>
-      </div>
-
-      <div class="junction-container">
-        <div class="intersection">
-          <!-- North-South Road -->
-          <div class="road-ns"></div>
-          <!-- East-West Road -->
-          <div class="road-ew"></div>
-
-          <!-- Central Box -->
-          <div class="intersection-center">
-            <div class="junction-grid-box">
-              <div class="center-marker"></div>
-            </div>
+    <!-- Left Column: Physical Junction & Approach Telemetry -->
+    <div class="dashboard-col-left">
+      <!-- 4-Way Traffic Junction Visualization -->
+      <section class="panel junction-panel" aria-label="Traffic Junction View">
+        <div class="panel-header">
+          <h2>
+            <span>&#9680;</span> 4-Way Traffic Junction
+          </h2>
+          <!-- Corridor Flow Status Toolbar (Cleanly positioned in header outside roadway) -->
+          <div class="junction-header-status">
+            <span id="flowNS" class="flow-pill flow-active">NS: FLOWING (GREEN)</span>
+            <span id="flowEW" class="flow-pill flow-stopped">EW: STOPPED (RED)</span>
+            <span id="activeAxisLabel" class="state-axis">Active Axis: North-South</span>
           </div>
-
-          <!-- Road Markings: Dividers -->
-          <div class="divider-ns-north"></div>
-          <div class="divider-ns-south"></div>
-          <div class="divider-ew-west"></div>
-          <div class="divider-ew-east"></div>
-
-          <!-- Stop Lines -->
-          <div class="stop-line-north" title="North approach stop line"></div>
-          <div class="stop-line-south" title="South approach stop line"></div>
-          <div class="stop-line-west" title="West approach stop line"></div>
-          <div class="stop-line-east" title="East approach stop line"></div>
-
-          <!-- Crosswalks -->
-          <div class="crosswalk crosswalk-north"></div>
-          <div class="crosswalk crosswalk-south"></div>
-          <div class="crosswalk crosswalk-west"></div>
-          <div class="crosswalk crosswalk-east"></div>
-
-          <!-- Vehicles Simulation Layer -->
-          <div id="vehiclesLayer" class="vehicles-layer" aria-hidden="true"></div>
-
-          <!-- Flow Status Overlays -->
-          <div id="flowNS" class="flow-indicator flow-ns flow-active">NS Flowing</div>
-          <div id="flowEW" class="flow-indicator flow-ew flow-stopped">EW Stopped</div>
-
-          <!-- Traffic Signal Units -->
-          <!-- NORTH SIGNAL -->
-          <div id="signalNorth" class="signal-unit signal-north">
-            <div class="signal-header">
-              <span class="signal-direction-label">NORTH</span>
-              <span id="timerNorth" class="signal-countdown">10</span>
-            </div>
-            <div class="signal-housing">
-              <div id="lampNorthRed" class="lamp lamp-red"></div>
-              <div id="lampNorthYellow" class="lamp lamp-yellow"></div>
-              <div id="lampNorthGreen" class="lamp lamp-green active"></div>
-            </div>
-          </div>
-
-          <!-- SOUTH SIGNAL -->
-          <div id="signalSouth" class="signal-unit signal-south">
-            <div class="signal-header">
-              <span class="signal-direction-label">SOUTH</span>
-              <span id="timerSouth" class="signal-countdown">10</span>
-            </div>
-            <div class="signal-housing">
-              <div id="lampSouthRed" class="lamp lamp-red"></div>
-              <div id="lampSouthYellow" class="lamp lamp-yellow"></div>
-              <div id="lampSouthGreen" class="lamp lamp-green active"></div>
-            </div>
-          </div>
-
-          <!-- WEST SIGNAL -->
-          <div id="signalWest" class="signal-unit signal-west">
-            <div class="signal-header">
-              <span class="signal-direction-label">WEST</span>
-              <span id="timerWest" class="signal-countdown">10</span>
-            </div>
-            <div class="signal-housing">
-              <div id="lampWestRed" class="lamp lamp-red active"></div>
-              <div id="lampWestYellow" class="lamp lamp-yellow"></div>
-              <div id="lampWestGreen" class="lamp lamp-green"></div>
-            </div>
-          </div>
-
-          <!-- EAST SIGNAL -->
-          <div id="signalEast" class="signal-unit signal-east">
-            <div class="signal-header">
-              <span class="signal-direction-label">EAST</span>
-              <span id="timerEast" class="signal-countdown">10</span>
-            </div>
-            <div class="signal-housing">
-              <div id="lampEastRed" class="lamp lamp-red active"></div>
-              <div id="lampEastYellow" class="lamp lamp-yellow"></div>
-              <div id="lampEastGreen" class="lamp lamp-green"></div>
-            </div>
-          </div>
-
         </div>
-      </div>
-    </section>
 
-    <!-- Right: FSM Telemetry, State Inspector & Safety Verification -->
-    <div class="dashboard-side">
+        <!-- Emergency Preemption Alert Banner -->
+        <div id="emergencyBanner" class="emergency-banner" style="display:none; margin-bottom:0.75rem;">
+          <span>🚨 <strong>EMERGENCY PREEMPTION:</strong> <span id="emergencyBannerText">Ambulance Approaching</span></span>
+          <span id="emergencyBannerPhase" style="font-family:var(--font-mono); font-size:0.75rem;">Securing Clearance...</span>
+        </div>
+
+        <div class="junction-container">
+          <div class="intersection">
+            <!-- North-South Road -->
+            <div class="road-ns"></div>
+            <!-- East-West Road -->
+            <div class="road-ew"></div>
+
+            <!-- Central Box -->
+            <div class="intersection-center">
+              <div class="junction-grid-box">
+                <div class="center-marker"></div>
+              </div>
+            </div>
+
+            <!-- Road Markings: Dividers -->
+            <div class="divider-ns-north"></div>
+            <div class="divider-ns-south"></div>
+            <div class="divider-ew-west"></div>
+            <div class="divider-ew-east"></div>
+
+            <!-- Stop Lines -->
+            <div class="stop-line-north" title="North approach stop line"></div>
+            <div class="stop-line-south" title="South approach stop line"></div>
+            <div class="stop-line-west" title="West approach stop line"></div>
+            <div class="stop-line-east" title="East approach stop line"></div>
+
+            <!-- Crosswalks: Placed at junction entrance threshold connecting sidewalk corners -->
+            <div class="crosswalk crosswalk-north"></div>
+            <div class="crosswalk crosswalk-south"></div>
+            <div class="crosswalk crosswalk-west"></div>
+            <div class="crosswalk crosswalk-east"></div>
+
+            <!-- Vehicles Simulation Layer -->
+            <div id="vehiclesLayer" class="vehicles-layer" aria-hidden="true"></div>
+
+            <!-- Traffic Signal Units -->
+            <!-- NORTH SIGNAL -->
+            <div id="signalNorth" class="signal-unit signal-north">
+              <div class="signal-header">
+                <span class="signal-direction-label">NORTH</span>
+                <span id="timerNorth" class="signal-countdown">10</span>
+              </div>
+              <div class="signal-housing">
+                <div id="lampNorthRed" class="lamp lamp-red"></div>
+                <div id="lampNorthYellow" class="lamp lamp-yellow"></div>
+                <div id="lampNorthGreen" class="lamp lamp-green active"></div>
+              </div>
+            </div>
+
+            <!-- SOUTH SIGNAL -->
+            <div id="signalSouth" class="signal-unit signal-south">
+              <div class="signal-header">
+                <span class="signal-direction-label">SOUTH</span>
+                <span id="timerSouth" class="signal-countdown">10</span>
+              </div>
+              <div class="signal-housing">
+                <div id="lampSouthRed" class="lamp lamp-red"></div>
+                <div id="lampSouthYellow" class="lamp lamp-yellow"></div>
+                <div id="lampSouthGreen" class="lamp lamp-green active"></div>
+              </div>
+            </div>
+
+            <!-- WEST SIGNAL -->
+            <div id="signalWest" class="signal-unit signal-west">
+              <div class="signal-header">
+                <span class="signal-direction-label">WEST</span>
+                <span id="timerWest" class="signal-countdown">10</span>
+              </div>
+              <div class="signal-housing">
+                <div id="lampWestRed" class="lamp lamp-red active"></div>
+                <div id="lampWestYellow" class="lamp lamp-yellow"></div>
+                <div id="lampWestGreen" class="lamp lamp-green"></div>
+              </div>
+            </div>
+
+            <!-- EAST SIGNAL -->
+            <div id="signalEast" class="signal-unit signal-east">
+              <div class="signal-header">
+                <span class="signal-direction-label">EAST</span>
+                <span id="timerEast" class="signal-countdown">10</span>
+              </div>
+              <div class="signal-housing">
+                <div id="lampEastRed" class="lamp lamp-red active"></div>
+                <div id="lampEastYellow" class="lamp lamp-yellow"></div>
+                <div id="lampEastGreen" class="lamp lamp-green"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- Directional Approach Queues & Congestion Heatmap -->
+      <section class="panel" style="padding:1rem;" aria-label="Directional Approach Queues & Congestion">
+        <div class="panel-header" style="margin-bottom:0.5rem;">
+          <h2><span>&#128392;</span> Approach Queues & Congestion Heatmap</h2>
+          <span class="badge" style="background:#082f49; color:#38bdf8; font-size:0.7rem;">4-Quadrant Telemetry</span>
+        </div>
+        <div>
+          <span class="kpi-label">Current Queue Length by Approach:</span>
+          <div class="queue-row" style="margin-top:0.35rem;">
+            <div id="queueCardN" class="queue-badge">
+              <span class="q-dir">NORTH</span>
+              <span id="queueN" class="q-count">0</span>
+            </div>
+            <div id="queueCardS" class="queue-badge">
+              <span class="q-dir">SOUTH</span>
+              <span id="queueS" class="q-count">0</span>
+            </div>
+            <div id="queueCardE" class="queue-badge">
+              <span class="q-dir">EAST</span>
+              <span id="queueE" class="q-count">0</span>
+            </div>
+            <div id="queueCardW" class="queue-badge">
+              <span class="q-dir">WEST</span>
+              <span id="queueW" class="q-count">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:0.8rem;">
+          <span class="kpi-label">Approach Congestion Intensity Heatmap:</span>
+          <div class="heatmap-container" style="margin-top:0.35rem;">
+            <div id="heatNorth" class="heatmap-cell">
+              <span class="hm-dir">NORTH</span>
+              <span id="heatStatusNorth" class="hm-status">CLEAR</span>
+            </div>
+            <div id="heatSouth" class="heatmap-cell">
+              <span class="hm-dir">SOUTH</span>
+              <span id="heatStatusSouth" class="hm-status">CLEAR</span>
+            </div>
+            <div id="heatEast" class="heatmap-cell">
+              <span class="hm-dir">EAST</span>
+              <span id="heatStatusEast" class="hm-status">CLEAR</span>
+            </div>
+            <div id="heatWest" class="heatmap-cell">
+              <span class="hm-dir">WEST</span>
+              <span id="heatStatusWest" class="hm-status">CLEAR</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Live Transition Event Log -->
+      <section class="panel" style="padding:0.85rem;" aria-label="Transition Event Log">
+        <div class="panel-header" style="margin-bottom:0.4rem; padding-bottom:0.3rem;">
+          <h2 style="font-size:0.9rem;"><span>&#9881;</span> State Transition Log</h2>
+          <button id="btnClearLog" style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:0.7rem;">Clear</button>
+        </div>
+        <div id="eventLog" class="event-log">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+    </div>
+
+    <!-- Right Column: FSM Telemetry, State Inspector & Safety Verification -->
+    <div class="dashboard-col-right dashboard-side">
       <!-- Active State Card -->
       <section class="active-state-card" aria-label="Current State Telemetry">
         <div class="state-meta-row">
@@ -268,7 +334,7 @@
       <!-- Traffic Analytics KPI Section -->
       <section class="panel" style="padding:1rem;" aria-label="Traffic Analytics">
         <div class="panel-header" style="margin-bottom:0.5rem;">
-          <h2><span>&#128202;</span> Traffic Analytics</h2>
+          <h2><span>&#128202;</span> Traffic Performance & Analytics</h2>
           <span id="densityBadge" class="badge" style="background:#082f49; color:#38bdf8; font-size:0.7rem;">Mode: Medium</span>
         </div>
         <div class="analytics-grid">
@@ -289,7 +355,7 @@
             <span id="statThroughput" class="kpi-val throughput">0 veh/min</span>
           </div>
           <div class="kpi-card">
-            <span class="kpi-label">Emergency Priority Cleared</span>
+            <span class="kpi-label">Emergency Cleared</span>
             <span id="statEmergencyCount" class="kpi-val highlight" style="color:#f43f5e;">0</span>
           </div>
           <div class="kpi-card">
@@ -301,53 +367,9 @@
             <span id="statDelaySaved" class="kpi-val highlight">0.0s</span>
           </div>
         </div>
-        <div style="margin-top:0.6rem;">
-          <span class="kpi-label">Current Queue Length by Approach:</span>
-          <div class="queue-row">
-            <div id="queueCardN" class="queue-badge">
-              <span class="q-dir">NORTH</span>
-              <span id="queueN" class="q-count">0</span>
-            </div>
-            <div id="queueCardS" class="queue-badge">
-              <span class="q-dir">SOUTH</span>
-              <span id="queueS" class="q-count">0</span>
-            </div>
-            <div id="queueCardE" class="queue-badge">
-              <span class="q-dir">EAST</span>
-              <span id="queueE" class="q-count">0</span>
-            </div>
-            <div id="queueCardW" class="queue-badge">
-              <span class="q-dir">WEST</span>
-              <span id="queueW" class="q-count">0</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Approach Congestion Heatmap -->
-        <div style="margin-top:0.6rem;">
-          <span class="kpi-label">Approach Congestion Intensity Heatmap:</span>
-          <div class="heatmap-container">
-            <div id="heatNorth" class="heatmap-cell">
-              <span class="hm-dir">NORTH</span>
-              <span id="heatStatusNorth" class="hm-status">CLEAR</span>
-            </div>
-            <div id="heatSouth" class="heatmap-cell">
-              <span class="hm-dir">SOUTH</span>
-              <span id="heatStatusSouth" class="hm-status">CLEAR</span>
-            </div>
-            <div id="heatEast" class="heatmap-cell">
-              <span class="hm-dir">EAST</span>
-              <span id="heatStatusEast" class="hm-status">CLEAR</span>
-            </div>
-            <div id="heatWest" class="heatmap-cell">
-              <span class="hm-dir">WEST</span>
-              <span id="heatStatusWest" class="hm-status">CLEAR</span>
-            </div>
-          </div>
-        </div>
 
         <!-- Queue History Timeline (Pure SVG Sparkline) -->
-        <div class="analytics-chart-container">
+        <div class="analytics-chart-container" style="margin-top:0.8rem;">
           <div class="chart-header">
             <span>Queue History (Rolling Timeline)</span>
             <div class="chart-legend">
@@ -395,17 +417,6 @@
           <div style="color:var(--text-dim); font-style:italic;">Click "Run Invariant Tests" to execute the full verification suite.</div>
         </div>
       </section>
-
-      <!-- Live Event Log -->
-      <section class="panel" style="padding:0.85rem;" aria-label="Transition Event Log">
-        <div class="panel-header" style="margin-bottom:0.4rem; padding-bottom:0.3rem;">
-          <h2 style="font-size:0.9rem;"><span>&#9881;</span> State Transition Log</h2>
-          <button id="btnClearLog" style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:0.7rem;">Clear</button>
-        </div>
-        <div id="eventLog" class="event-log">
-          <!-- Populated dynamically -->
-        </div>
-      </section>
     </div>
   </main>
 
@@ -421,7 +432,9 @@
       <a href="docs/user-guide.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">User Guide</a>&bull;
       <a href="docs/final-audit-report.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">Final Audit Report</a>&bull;
       <a href="docs/phase-7-investigation.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">Phase 7 Investigation</a>&bull;
-      <a href="docs/phase-7-remediation-report.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">Phase 7 Remediation</a>
+      <a href="docs/phase-7-remediation-report.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">Phase 7 Remediation</a>&bull;
+      <a href="docs/phase-8-visual-audit.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">Phase 8 Visual Audit</a>&bull;
+      <a href="docs/phase-8-remediation-report.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">Phase 8 Remediation</a>
     </div>
   </footer>
 

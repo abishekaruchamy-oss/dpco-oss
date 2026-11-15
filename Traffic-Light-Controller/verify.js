@@ -1084,6 +1084,95 @@
           `Active Vehicles: ${totalActive}, Frozen: ${frozenCount}, Total Cleared: ${scVm.analytics.totalPassed}`
         );
       }
+
+      // =========================================================================
+      // Phase 8: Visual Audit, UI Synchronization & Crosswalk Invariants
+      // =========================================================================
+
+      // --- TEST 51: Phase 8 - Authoritative Demand Snapshot Fidelity ---
+      if (AdaptiveController) {
+        const ac = new AdaptiveController();
+        const initialDecisionRationale = ac.getLastDecision().rationale;
+        const testQueues = { north: 7, south: 5, east: 1, west: 1 };
+        const testApproaching = { north: 1, south: 0, east: 0, west: 0 };
+        const liveEval = ac.getLiveDemandEvaluation('S0_NS_GREEN', testQueues, testApproaching);
+
+        assert(
+          liveEval &&
+          liveEval.demandNS === 12.4 &&
+          liveEval.demandEW === 2.0 &&
+          liveEval.duration > 10 &&
+          liveEval.rationale.includes('North-South traffic demand') &&
+          ac.getLastDecision().rationale === initialDecisionRationale,
+          'Phase 8: Authoritative demand snapshot evaluation is zero-side-effect and mathematically consistent',
+          `NS: ${liveEval.demandNS}, EW: ${liveEval.demandEW}, Duration: ${liveEval.duration}s, Unchanged LastDecision: true`
+        );
+      }
+
+      // --- TEST 52: Phase 8 - XAI Rationale Mode Synchronization ---
+      if (AdaptiveController) {
+        const ac = new AdaptiveController();
+        ac.setMode('FIXED');
+        const fixedEval = ac.getLiveDemandEvaluation('S0_NS_GREEN', { north: 5, south: 5, east: 0, west: 0 });
+        ac.setMode('MANUAL');
+        const manualEval = ac.getLiveDemandEvaluation('S0_NS_GREEN', { north: 5, south: 5, east: 0, west: 0 });
+
+        assert(
+          fixedEval.mode === 'FIXED' &&
+          fixedEval.duration === 10 &&
+          fixedEval.rationale.includes('Fixed Timing Mode') &&
+          manualEval.mode === 'MANUAL' &&
+          manualEval.rationale.includes('Manual Timing Mode'),
+          'Phase 8: XAI decision logic and duration synchronize accurately across operational modes',
+          `Fixed: "${fixedEval.rationale.slice(0, 35)}...", Manual: "${manualEval.rationale.slice(0, 35)}..."`
+        );
+      }
+
+      // --- TEST 53: Phase 8 - Priority Green Hold and Transition Release Synchronization ---
+      {
+        const fsmHold = new TrafficLightFSM();
+        fsmHold.requestEmergencyPriority('north');
+        const holdingBefore = fsmHold.isHoldingPriorityGreen();
+        const signalsDuring = fsmHold.getSignals();
+        fsmHold.clearEmergencyPriority();
+        const holdingAfter = fsmHold.isHoldingPriorityGreen();
+
+        assert(
+          holdingBefore === true &&
+          signalsDuring.north === 'GREEN' &&
+          signalsDuring.east === 'RED' &&
+          holdingAfter === false,
+          'Phase 8: Emergency priority green hold active during transit and safely released post-clearance',
+          `Holding before: ${holdingBefore}, East Light: ${signalsDuring.east}, Holding after: ${holdingAfter}`
+        );
+      }
+
+      // --- TEST 54: Phase 8 - Stop Line and Pedestrian Crosswalk Spatial Boundary Invariant ---
+      {
+        const vmGeo = new VehicleManager();
+        const fsmGeo = new TrafficLightFSM();
+        fsmGeo.step(); // S1
+        fsmGeo.step(); // S2 (EW Green, NS Red)
+        vmGeo.spawnVehicle('north', 'CAR');
+
+        for (let t = 0; t < 300; t++) {
+          vmGeo.update(0.05, fsmGeo.getSignals());
+        }
+
+        const northCar = vmGeo.lanes.north[0];
+        const STOP_LINE_POS = 138;
+        const CROSSWALK_MOUTH_POS = 154;
+
+        assert(
+          northCar &&
+          northCar.speed === 0 &&
+          northCar.pos <= STOP_LINE_POS &&
+          northCar.pos < CROSSWALK_MOUTH_POS &&
+          (CROSSWALK_MOUTH_POS - northCar.pos) >= 14,
+          'Phase 8: Stopped vehicle halts strictly behind stop line and maintains clearance from pedestrian crosswalk',
+          `Halt Pos: ${northCar.pos.toFixed(1)}px (Stop Line: ${STOP_LINE_POS}px, Crosswalk Mouth: ${CROSSWALK_MOUTH_POS}px, Clearance: ${(CROSSWALK_MOUTH_POS - northCar.pos).toFixed(1)}px)`
+        );
+      }
     }
 
     return results;
