@@ -1151,3 +1151,106 @@ body {
   font-size: 0.8rem;
   cursor: pointer;
 }
+
+/* ==========================================================================
+   Phase 3: Adaptive Signal Control & Explainability
+   ========================================================================== */
+
+.mode-selector-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.mode-selector-group select {
+  background: var(--bg-card);
+  color: #38bdf8;
+  border: 1px solid #0284c7;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.adaptive-card {
+  background: var(--bg-card);
+  border: 1px solid #1e3a8a;
+  border-radius: 10px;
+  padding: 0.9rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.adaptive-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.adaptive-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #93c5fd;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.demand-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+}
+
+.demand-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+}
+
+.demand-bar-track {
+  width: 100%;
+  height: 8px;
+  background: #0f172a;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  border: 1px solid #1e293b;
+}
+
+.demand-fill-ns {
+  height: 100%;
+  background: #3b82f6;
+  transition: width 0.3s ease;
+}
+
+.demand-fill-ew {
+  height: 100%;
+  background: #ec4899;
+  transition: width 0.3s ease;
+}
+
+.rationale-box {
+  background: #0b1329;
+  border-left: 3px solid #38bdf8;
+  border-radius: 4px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.rationale-box strong {
+  color: #38bdf8;
+}
+  font-size: 0.8rem;
+  cursor: pointer;
+}

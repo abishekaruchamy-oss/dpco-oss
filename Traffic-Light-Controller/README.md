@@ -17,6 +17,7 @@ Traffic-Light-Controller/
 ├── style.css         # Styling, realistic glowing signal lamps, vehicles, and KPI grid
 ├── fsm.js            # Pure Finite State Machine core, states, transitions & invariant logic
 ├── vehicles.js       # Vehicle physics, queue discipline, traffic density & analytics engine
+├── adaptive.js       # Adaptive signal timing engine, demand modeling & XAI rationale
 ├── app.js            # Application controller: DOM bindings, countdown loop & 60fps render
 ├── verify.js         # Automated verification suite (runs in CLI and in-browser)
 └── README.md         # Architecture, FSM documentation, and verification proofs
@@ -107,7 +108,38 @@ The simulation calculates and displays real-time performance indicators:
 
 ---
 
-## 5. Safety Invariant Proof & Fail-Safe Design
+## 5. Adaptive Intelligent Signal Timing & Explainable AI (Phase 3)
+
+The Adaptive Signal Control Engine dynamically tailors green intervals to real-time traffic conditions while maintaining deterministic FSM transitions.
+
+### 5.1 Dynamic Demand Calculation
+For each orthogonal corridor, demand $D$ is calculated using discrete queued vehicles ($Q$, weight 1.0) and inbound approaching traffic ($A$, weight 0.4):
+$$D_{\text{NS}} = (Q_{\text{North}} + Q_{\text{South}}) + 0.4 \times (A_{\text{North}} + A_{\text{South}})$$
+$$D_{\text{EW}} = (Q_{\text{East}} + Q_{\text{West}}) + 0.4 \times (A_{\text{East}} + A_{\text{West}})$$
+
+### 5.2 Dynamic Duration Allocation
+- **Demand-Responsive Scaling**: When an active axis has significantly greater demand than the cross street, green duration scales up:
+  $$T_{\text{green}} = \min\big(T_{\text{max}}, T_{\text{base}} + \Delta D \times 2.0\text{s}\big)$$
+- **Zero-Demand Truncation**: If an active corridor has zero waiting vehicles while the opposing street has backlog, green time is truncated to $T_{\text{min}} = 5\text{s}$ to expedite cycle rotation.
+- **Strict Boundary Bounds**:
+  $$5\text{s} \le T_{\text{green}} \le 25\text{s}$$
+- **Anti-Starvation Safeguard**: If an approach is held at minimum green for 2 consecutive cycles while cross traffic is high, the anti-starvation boost automatically grants extra green time (14s) to ensure fair throughput.
+- **Yellow Clearance Inviolability**: The 3-second yellow clearance interval is **never** compressed or bypassed under any adaptive condition.
+
+### 5.3 Operating Modes
+1. **Adaptive Mode**: Real-time automated demand optimization and explainability.
+2. **Fixed Mode**: Nominal static timing ($10\text{s}$ green, $3\text{s}$ yellow).
+3. **Manual Mode**: Direct user-configurable timing inputs from the state table.
+
+### 5.4 Explainable AI (XAI) Rationale
+Every timing decision produces a human-interpretable rationale displayed directly on the ITS dashboard:
+- *"North-South traffic demand (11.0) exceeds East-West (1.0). Green extended to 25s (+20s) to disperse queue."*
+- *"Zero queued vehicles detected on North-South. Green truncated to minimum threshold (5s) to expedite clearance for East-West (7.2 demand)."*
+- *"Demand is balanced (North-South: 4.0, East-West: 4.0). Standard nominal green duration (10s) assigned."*
+
+---
+
+## 6. Safety Invariant Proof & Fail-Safe Design
 
 ### 5.1 Primary Safety Invariant
 > **Critical Requirement**: Conflicting directions must **NEVER** receive green simultaneously.
@@ -163,21 +195,31 @@ You can run the full verification suite directly from the terminal:
 node Traffic-Light-Controller/verify.js
 ```
 
-### Verification Assertions Tested (23/23 Passing):
-- **Test 1**: Initial state is strictly $S0$ with North/South GREEN and East/West RED.
-- **Test 2**: Cyclic sequence fidelity ($S0 \to S1 \to S2 \to S3 \to S0$) over multiple cycles.
-- **Test 3**: Directional light outputs verify exact colors for all 4 approaches.
-- **Test 4**: Primary Safety Invariant proof over 200 consecutive transitions (zero conflicting greens).
-- **Test 5**: Synthetic fault injection: verifies that illegal dual-green and dual-clearance states are caught.
-- **Test 6**: Reset restores initial state $S0$ and clears transition counters.
-- **Test 7**: Custom state duration updates correctly apply and respect minimum bounds.
-- **Test 8**: Fail-Safe All-Red Halt forces all signals to RED and recovers safely.
-- **Test 9**: Vehicle movement and kinematics accelerate and traverse intersection under green signal.
-- **Test 10**: Red-light stopping invariant: vehicle halts completely at stop line on RED.
-- **Test 11**: Queue discipline & anti-collision: zero vehicle overlap in queues ($38\text{px}$ minimum spacing).
-- **Test 12**: Conflicting direction vehicle prevention: 0 simultaneous collision box occupancy.
-- **Test 13**: Traffic density presets: Low, Medium, High spawn scaling verified.
-- **Test 14**: Analytics mathematical consistency and conservation laws.
+### Verification Assertions Tested (35/35 Passing):
+- **Phase 1 (FSM Core & Signals)**:
+  - **Test 1**: Initial state is strictly $S0$ with North/South GREEN and East/West RED.
+  - **Test 2**: Cyclic sequence fidelity ($S0 \to S1 \to S2 \to S3 \to S0$) over multiple cycles.
+  - **Test 3**: Directional light outputs verify exact colors for all 4 approaches.
+  - **Test 4**: Primary Safety Invariant proof over 200 consecutive transitions (zero conflicting greens).
+  - **Test 5**: Synthetic fault injection: verifies that illegal dual-green and dual-clearance states are caught.
+  - **Test 6**: Reset restores initial state $S0$ and clears transition counters.
+  - **Test 7**: Custom state duration updates correctly apply and respect minimum bounds.
+- **Phase 2 (Vehicles, Queuing & Safety)**:
+  - **Test 8**: Fail-Safe All-Red Halt forces all signals to RED and recovers safely.
+  - **Test 9**: Vehicle movement and kinematics accelerate and traverse intersection under green signal.
+  - **Test 10**: Red-light stopping invariant: vehicle halts completely at stop line on RED.
+  - **Test 11**: Queue discipline & anti-collision: zero vehicle overlap in queues ($38\text{px}$ minimum spacing).
+  - **Test 12**: Conflicting direction vehicle prevention: 0 simultaneous collision box occupancy.
+  - **Test 13**: Traffic density presets: Low, Medium, High spawn scaling verified.
+  - **Test 14**: Analytics mathematical consistency and conservation laws.
+- **Phase 3 (Adaptive Signal Timing & XAI)**:
+  - **Test 15**: Adaptive controller default mode and clean switching (ADAPTIVE, FIXED, MANUAL).
+  - **Test 16**: Balanced traffic demand triggers nominal base green duration (10s).
+  - **Test 17**: Heavy North-South congestion scales green duration upwards with explainability rationale.
+  - **Test 18**: Heavy East-West congestion scales green duration upwards with explainability rationale.
+  - **Test 19**: Extreme traffic strictly clamped to $T_{\text{max}} = 25\text{s}$; zero demand truncated to $T_{\text{min}} = 5\text{s}$.
+  - **Test 20**: Anti-starvation invariant boosts green time after consecutive low-allocation cycles.
+  - **Test 21**: Yellow clearance (3s) remains inviolable under dynamic adaptive scaling.
 
 ---
 

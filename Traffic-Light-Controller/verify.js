@@ -23,11 +23,15 @@
 
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./fsm.js'), require('./vehicles.js'));
+    module.exports = factory(
+      require('./fsm.js'),
+      require('./vehicles.js'),
+      require('./adaptive.js')
+    );
   } else {
-    root.FSMVerifier = factory(root.TrafficFSM, root.VehicleManager);
+    root.FSMVerifier = factory(root.TrafficFSM, root.VehicleManager, root.AdaptiveController);
   }
-})(typeof self !== 'undefined' ? self : this, function (TrafficLightFSM, VehicleManager) {
+})(typeof self !== 'undefined' ? self : this, function (TrafficLightFSM, VehicleManager, AdaptiveController) {
   'use strict';
 
   function runVerificationSuite() {
@@ -390,6 +394,116 @@
         stats.avgWaitTime >= 0,
         'Traffic Analytics Mathematical Integrity & Conservation Proof',
         `Generated: ${stats.totalGenerated}, Passed: ${stats.totalPassed}, Queued: ${stats.queueTotal}`
+      );
+    }
+
+    // =========================================================================
+    // PHASE 3 VERIFICATION (Adaptive Signal Timing, XAI & Anti-Starvation)
+    // =========================================================================
+    if (AdaptiveController) {
+      const { MODES, DEFAULT_CONFIG } = AdaptiveController;
+
+      // --- TEST 15: Adaptive Controller Mode Switching ---
+      const ac = new AdaptiveController();
+      assert(
+        ac.getMode() === MODES.ADAPTIVE,
+        'Adaptive Controller Default Mode is ADAPTIVE',
+        `Mode: ${ac.getMode()}`
+      );
+
+      ac.setMode(MODES.FIXED);
+      assert(ac.getMode() === MODES.FIXED, 'Mode Switching: FIXED Mode Activated');
+
+      ac.setMode(MODES.MANUAL);
+      assert(ac.getMode() === MODES.MANUAL, 'Mode Switching: MANUAL Mode Activated');
+
+      ac.setMode(MODES.ADAPTIVE);
+      assert(ac.getMode() === MODES.ADAPTIVE, 'Mode Switching: Restored to ADAPTIVE');
+
+      // --- TEST 16: Balanced Demand Adaptive Timing ---
+      const balancedQueues = { north: 2, south: 2, east: 2, west: 2 };
+      const decBalanced = ac.evaluatePhaseDuration(STATES.S0_NS_GREEN, balancedQueues);
+      assert(
+        decBalanced.duration === DEFAULT_CONFIG.baseGreen,
+        'Adaptive Timing: Balanced Demand assigns Nominal Base Duration (10s)',
+        `Assigned duration: ${decBalanced.duration}s (NS demand: ${decBalanced.demandNS}, EW demand: ${decBalanced.demandEW})`
+      );
+
+      // --- TEST 17: Congestion-Responsive Scaling (North-South Congestion) ---
+      const nsCongestedQueues = { north: 6, south: 5, east: 0, west: 1 };
+      const decNS = ac.evaluatePhaseDuration(STATES.S0_NS_GREEN, nsCongestedQueues);
+      assert(
+        decNS.duration >= 20 && decNS.duration <= DEFAULT_CONFIG.maxGreen &&
+        decNS.rationale.includes('North-South traffic demand'),
+        'Adaptive Timing: Heavy North-South Congestion scales Green Duration upwards',
+        `Assigned: ${decNS.duration}s, Rationale: ${decNS.rationale}`
+      );
+
+      // --- TEST 18: Congestion-Responsive Scaling (East-West Congestion) ---
+      const ewCongestedQueues = { north: 1, south: 0, east: 7, west: 6 };
+      const decEW = ac.evaluatePhaseDuration(STATES.S2_EW_GREEN, ewCongestedQueues);
+      assert(
+        decEW.duration >= 20 && decEW.duration <= DEFAULT_CONFIG.maxGreen &&
+        decEW.rationale.includes('East-West traffic demand'),
+        'Adaptive Timing: Heavy East-West Congestion scales Green Duration upwards',
+        `Assigned: ${decEW.duration}s, Rationale: ${decEW.rationale}`
+      );
+
+      // --- TEST 19: Strict Boundary Enforcement (Tmin = 5s, Tmax = 25s) ---
+      const extremeQueue = { north: 50, south: 50, east: 0, west: 0 };
+      const decMax = ac.evaluatePhaseDuration(STATES.S0_NS_GREEN, extremeQueue);
+      assert(
+        decMax.duration === DEFAULT_CONFIG.maxGreen,
+        'Boundary Guard: Extreme Congestion strictly clamped to Max Green (25s)',
+        `Assigned: ${decMax.duration}s (Max bound: ${DEFAULT_CONFIG.maxGreen}s)`
+      );
+
+      const zeroQueue = { north: 0, south: 0, east: 6, west: 6 };
+      const decMin = ac.evaluatePhaseDuration(STATES.S0_NS_GREEN, zeroQueue);
+      assert(
+        decMin.duration === DEFAULT_CONFIG.minGreen,
+        'Boundary Guard: Zero Demand truncated to Minimum Green (5s) without starvation',
+        `Assigned: ${decMin.duration}s (Min bound: ${DEFAULT_CONFIG.minGreen}s)`
+      );
+
+      // --- TEST 20: Starvation Prevention & Anti-Starvation Safeguard ---
+      // Simulate consecutive low-demand cycles to trigger anti-starvation boost
+      ac.consecutiveMinCycles['North-South'] = 2;
+      const decStarveBoost = ac.evaluatePhaseDuration(STATES.S0_NS_GREEN, { north: 1, south: 1, east: 8, west: 8 });
+      assert(
+        decStarveBoost.duration > DEFAULT_CONFIG.baseGreen &&
+        decStarveBoost.rationale.includes('Anti-starvation safeguard'),
+        'Anti-Starvation Invariant: Consecutive Min-Cycles trigger Fair Throughput Allocation',
+        `Assigned: ${decStarveBoost.duration}s, Rationale: ${decStarveBoost.rationale}`
+      );
+
+      // --- TEST 21: Yellow Clearance Inviolability & FSM Coupling ---
+      const adaptiveFsm = new TrafficLightFSM();
+      // Apply extreme adaptive durations to green phases
+      adaptiveFsm.setDuration(STATES.S0_NS_GREEN, 25);
+      adaptiveFsm.setDuration(STATES.S2_EW_GREEN, 5);
+
+      // Assert yellow clearances are strictly 3 seconds
+      const s1Duration = adaptiveFsm.getDurationForState(STATES.S1_NS_YELLOW);
+      const s3Duration = adaptiveFsm.getDurationForState(STATES.S3_EW_YELLOW);
+
+      assert(
+        s1Duration === 3 && s3Duration === 3,
+        'Safety Clearance Inviolability: Yellow Clearance strictly 3s under Adaptive Scaling',
+        `S1 Yellow: ${s1Duration}s, S3 Yellow: ${s3Duration}s`
+      );
+
+      // Ensure cyclic sequence is strictly preserved
+      let seqPreserved = true;
+      seqPreserved = seqPreserved && (adaptiveFsm.step().currentState === STATES.S1_NS_YELLOW);
+      seqPreserved = seqPreserved && (adaptiveFsm.step().currentState === STATES.S2_EW_GREEN);
+      seqPreserved = seqPreserved && (adaptiveFsm.step().currentState === STATES.S3_EW_YELLOW);
+      seqPreserved = seqPreserved && (adaptiveFsm.step().currentState === STATES.S0_NS_GREEN);
+
+      assert(
+        seqPreserved,
+        'FSM Coupling Fidelity: Full cycle maintained without skipping yellow clearance',
+        'S0 -> S1 -> S2 -> S3 -> S0 cycle intact'
       );
     }
 

@@ -44,6 +44,14 @@
     </div>
 
     <div class="control-group">
+      <div class="mode-selector-group">
+        <label for="modeSelect">Timing Mode:</label>
+        <select id="modeSelect">
+          <option value="ADAPTIVE" selected>Adaptive Mode</option>
+          <option value="FIXED">Fixed Timing</option>
+          <option value="MANUAL">Manual Timing</option>
+        </select>
+      </div>
       <div class="density-selector-group">
         <label for="densitySelect">Density:</label>
         <select id="densitySelect">
@@ -195,6 +203,31 @@
         </div>
       </section>
 
+      <!-- Adaptive Signal Intelligence & XAI Panel -->
+      <section class="adaptive-card" aria-label="Adaptive Signal Control">
+        <div class="adaptive-header">
+          <span class="adaptive-title">&#9881; ADAPTIVE TIMING ENGINE</span>
+          <span id="adaptiveModeBadge" class="badge" style="background:#0c4a6e; color:#38bdf8; font-size:0.7rem;">ADAPTIVE ACTIVE</span>
+        </div>
+        <div class="demand-meter">
+          <div class="demand-labels">
+            <span style="color:#60a5fa;">NS Demand: <strong id="valDemandNS">0.0</strong></span>
+            <span style="color:#f472b6;">EW Demand: <strong id="valDemandEW">0.0</strong></span>
+          </div>
+          <div class="demand-bar-track">
+            <div id="demandFillNS" class="demand-fill-ns" style="width: 50%;"></div>
+            <div id="demandFillEW" class="demand-fill-ew" style="width: 50%;"></div>
+          </div>
+        </div>
+        <div class="rationale-box">
+          <div><strong>Decision Logic:</strong> <span id="adaptiveRationaleText">System initialized. Analyzing dynamic corridor demand...</span></div>
+          <div style="margin-top:0.3rem; display:flex; justify-content:space-between; font-size:0.7rem; color:#94a3b8;">
+            <span>Evaluated Green: <strong id="adaptiveCalculatedDuration" style="color:#34d399;">10s</strong></span>
+            <span>Boundaries: <strong>5s (min) &ndash; 25s (max)</strong></span>
+          </div>
+        </div>
+      </section>
+
       <!-- Safety Invariant Monitor -->
       <section id="safetyCard" class="invariant-card" aria-label="Safety Invariant Proof">
         <div class="invariant-header">
@@ -315,6 +348,7 @@
   <!-- Scripts -->
   <script src="fsm.js"></script>
   <script src="vehicles.js"></script>
+  <script src="adaptive.js"></script>
   <script src="verify.js"></script>
   <script src="app.js"></script>
 </body>

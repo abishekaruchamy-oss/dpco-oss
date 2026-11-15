@@ -17,6 +17,7 @@
   // State instances
   let fsm = null;
   let vehicleManager = null;
+  let adaptiveController = null;
   let simStatus = SIM_STATUS.STOPPED;
   let timerInterval = null;
   let remainingSeconds = 10;
@@ -37,6 +38,14 @@
     speedSelect: document.getElementById('speedSelect'),
     densitySelect: document.getElementById('densitySelect'),
     densityBadge: document.getElementById('densityBadge'),
+    modeSelect: document.getElementById('modeSelect'),
+    adaptiveModeBadge: document.getElementById('adaptiveModeBadge'),
+    valDemandNS: document.getElementById('valDemandNS'),
+    valDemandEW: document.getElementById('valDemandEW'),
+    demandFillNS: document.getElementById('demandFillNS'),
+    demandFillEW: document.getElementById('demandFillEW'),
+    adaptiveRationaleText: document.getElementById('adaptiveRationaleText'),
+    adaptiveCalculatedDuration: document.getElementById('adaptiveCalculatedDuration'),
     btnRunVerification: document.getElementById('btnRunVerification'),
     btnClearLog: document.getElementById('btnClearLog'),
 
@@ -127,6 +136,10 @@
   function init() {
     fsm = new window.TrafficFSM();
 
+    if (window.AdaptiveController) {
+      adaptiveController = new window.AdaptiveController();
+    }
+
     if (window.VehicleManager) {
       vehicleManager = new window.VehicleManager({
         containerElement: elements.vehiclesLayer,
@@ -197,6 +210,24 @@
         }
       }
     });
+
+    // Update real-time Adaptive Demand Meter
+    if (adaptiveController && vehicleManager) {
+      const demandData = adaptiveController.analyzeTrafficDemand(data.queueLengths);
+      if (elements.valDemandNS) elements.valDemandNS.textContent = demandData.demandNS.toFixed(1);
+      if (elements.valDemandEW) elements.valDemandEW.textContent = demandData.demandEW.toFixed(1);
+
+      const totalD = demandData.demandNS + demandData.demandEW;
+      if (totalD > 0) {
+        const nsPct = Math.round((demandData.demandNS / totalD) * 100);
+        const ewPct = 100 - nsPct;
+        if (elements.demandFillNS) elements.demandFillNS.style.width = `${nsPct}%`;
+        if (elements.demandFillEW) elements.demandFillEW.style.width = `${ewPct}%`;
+      } else {
+        if (elements.demandFillNS) elements.demandFillNS.style.width = `50%`;
+        if (elements.demandFillEW) elements.demandFillEW.style.width = `50%`;
+      }
+    }
   }
 
   /**
@@ -463,6 +494,29 @@
     elapsedSeconds++;
 
     if (remainingSeconds <= 0) {
+      // Evaluate adaptive timing before entering next state
+      const nextMeta = fsm.getCurrentStateMetadata();
+      const targetStateKey = nextMeta.nextState;
+
+      if (adaptiveController && vehicleManager) {
+        if (targetStateKey === window.TrafficFSM.STATES.S0_NS_GREEN || targetStateKey === window.TrafficFSM.STATES.S2_EW_GREEN) {
+          const queues = vehicleManager.getAnalytics().queueLengths;
+          const decision = adaptiveController.evaluatePhaseDuration(targetStateKey, queues);
+
+          if (adaptiveController.getMode() === 'ADAPTIVE') {
+            fsm.setDuration(targetStateKey, decision.duration);
+
+            if (elements.adaptiveRationaleText) elements.adaptiveRationaleText.textContent = decision.rationale;
+            if (elements.adaptiveCalculatedDuration) elements.adaptiveCalculatedDuration.textContent = `${decision.duration}s (${decision.axis})`;
+
+            const durationInput = document.querySelector(`.duration-input[data-state="${targetStateKey}"]`);
+            if (durationInput) durationInput.value = decision.duration;
+
+            logEvent(`Adaptive Control [${decision.axis}]: Green calculated at ${decision.duration}s. Reason: ${decision.rationale}`);
+          }
+        }
+      }
+
       // Transition to next FSM state
       const res = fsm.step();
       remainingSeconds = res.metadata.duration;
@@ -631,6 +685,29 @@
     elements.btnReset.addEventListener('click', resetSimulation);
     elements.btnStep.addEventListener('click', manualStep);
     elements.btnAllRed.addEventListener('click', toggleAllRedHalt);
+
+    if (elements.modeSelect) {
+      elements.modeSelect.addEventListener('change', (e) => {
+        const mode = e.target.value;
+        if (adaptiveController) {
+          adaptiveController.setMode(mode);
+        }
+        if (elements.adaptiveModeBadge) {
+          elements.adaptiveModeBadge.textContent = `${mode} MODE`;
+          if (mode === 'ADAPTIVE') {
+            elements.adaptiveModeBadge.style.background = '#0c4a6e';
+            elements.adaptiveModeBadge.style.color = '#38bdf8';
+          } else if (mode === 'FIXED') {
+            elements.adaptiveModeBadge.style.background = '#312e81';
+            elements.adaptiveModeBadge.style.color = '#c7d2fe';
+          } else {
+            elements.adaptiveModeBadge.style.background = '#3f3f46';
+            elements.adaptiveModeBadge.style.color = '#e4e4e7';
+          }
+        }
+        logEvent(`Timing mode set to ${mode}.`);
+      });
+    }
 
     if (elements.densitySelect) {
       elements.densitySelect.addEventListener('change', (e) => {
