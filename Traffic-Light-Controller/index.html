@@ -204,6 +204,160 @@
         </div>
       </section>
 
+      <!-- DPCO — DIGITAL LOGIC GATE WORKBENCH -->
+      <section class="panel logic-workbench-panel" id="panelLogicWorkbench" aria-label="Digital Logic Gate Workbench">
+        <div class="panel-header logic-workbench-header">
+          <div>
+            <h2><span>&#9889;</span> DPCO — DIGITAL LOGIC GATE WORKBENCH</h2>
+            <div class="logic-workbench-subtitle">Live Boolean Logic &bull; Traffic Signal Control &bull; FSM Decision Architecture</div>
+          </div>
+          <div class="logic-header-badges">
+            <span id="logicSimStatusBadge" class="badge badge-status running">LIVE</span>
+            <span class="badge" style="background:#1e1b4b; color:#c7d2fe; border:1px solid #4338ca; font-size:0.68rem;">DPCO &bull; HARDWARE INTERLOCKS</span>
+          </div>
+        </div>
+
+        <p class="logic-intro-text">
+          This workbench demonstrates how digital logic gates and Boolean expressions evaluate traffic signal outputs, vehicle-entry permissions, and fail-safe safety conditions in the controller.
+        </p>
+
+        <!-- Mode Switcher Tabs -->
+        <div class="logic-mode-tabs" role="tablist" aria-label="Logic Workbench Mode Selector">
+          <button id="tabModeLive" class="logic-tab-btn active" role="tab" aria-selected="true" aria-controls="logicLiveModeContainer">
+            <span class="tab-icon">&#9889;</span> Live Controller Mode
+          </button>
+          <button id="tabModeLearning" class="logic-tab-btn" role="tab" aria-selected="false" aria-controls="logicLearningModeContainer">
+            <span class="tab-icon">&#128300;</span> Learning Workbench Mode
+          </button>
+        </div>
+
+        <!-- 1. LIVE CONTROLLER MODE CONTAINER -->
+        <div id="logicLiveModeContainer" class="logic-mode-view active" role="tabpanel" aria-labelledby="tabModeLive">
+          <!-- Circuit Selector Pills -->
+          <div class="circuit-selector-bar" role="group" aria-label="Live Controller Circuit Selector">
+            <button class="circuit-btn active" data-circuit="NS_GREEN">1. NS Green Auth</button>
+            <button class="circuit-btn" data-circuit="EW_GREEN">2. EW Green Auth</button>
+            <button class="circuit-btn" data-circuit="SAFETY_HALT">3. Safety Interlock</button>
+            <button class="circuit-btn" data-circuit="VEHICLE_ENTRY">4. Vehicle Entry Perm</button>
+            <button class="circuit-btn" data-circuit="EMERGENCY_HOLD">5. Priority Hold</button>
+            <button class="circuit-btn" data-circuit="INVARIANT_DEFENSE">6. Conflict Monitor</button>
+          </div>
+
+          <!-- Active Circuit Workspace Card -->
+          <div class="circuit-card">
+            <div class="circuit-card-header">
+              <div>
+                <h3 id="liveCircuitTitle" class="circuit-title">North-South Green Authorization Circuit</h3>
+                <div id="liveCircuitAnalogy" class="circuit-analogy">Synchronous Moore Output with Active-Low Interlock</div>
+              </div>
+              <span id="liveCircuitStatusPill" class="circuit-status-pill pill-high">OUTPUT: HIGH (1)</span>
+            </div>
+
+            <!-- Boolean Equation Bar -->
+            <div class="equation-box">
+              <span class="eq-label">BOOLEAN LOGIC EQUATION:</span>
+              <code id="liveCircuitEquation" class="eq-code">NS_Green = S0 ∧ ¬AllRed ∧ ¬Fault</code>
+            </div>
+
+            <!-- SVG Schematic Viewport -->
+            <div id="liveCircuitSvgWrapper" class="circuit-svg-viewport">
+              <!-- Inline SVG rendered by logic.js -->
+            </div>
+
+            <!-- Live Subterms & Inputs Monitor -->
+            <div class="circuit-subterms-bar">
+              <span class="subterms-label">LIVE CIRCUIT SIGNALS:</span>
+              <div id="liveCircuitInputsList" class="subterms-list">
+                <!-- Dynamically populated live input pills -->
+              </div>
+            </div>
+
+            <!-- Educational Context -->
+            <div id="liveCircuitExplanation" class="circuit-explanation">
+              <!-- Explanation populated dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. LEARNING WORKBENCH MODE CONTAINER (SANDBOXED) -->
+        <div id="logicLearningModeContainer" class="logic-mode-view" role="tabpanel" aria-labelledby="tabModeLearning" style="display:none;">
+          <!-- Gate Selector Bar -->
+          <div class="gate-selector-bar" role="group" aria-label="Standard Gate Selector">
+            <button class="gate-btn active" data-gate="AND">AND</button>
+            <button class="gate-btn" data-gate="OR">OR</button>
+            <button class="gate-btn" data-gate="NOT">NOT</button>
+            <button class="gate-btn" data-gate="NAND">NAND</button>
+            <button class="gate-btn" data-gate="NOR">NOR</button>
+            <button class="gate-btn" data-gate="XOR">XOR</button>
+            <button class="gate-btn" data-gate="XNOR">XNOR</button>
+          </div>
+
+          <div class="learning-grid">
+            <!-- Left: Interactive Gate Schematic & Controls -->
+            <div class="learning-circuit-card">
+              <div class="learning-card-header">
+                <h3 id="learningGateTitle" class="circuit-title">AND Gate (Product)</h3>
+                <span id="learningGateOutputPill" class="circuit-status-pill pill-low">OUTPUT Y: 0 (LOW)</span>
+              </div>
+
+              <!-- Interactive Controls (Sandboxed) -->
+              <div class="learning-inputs-bar">
+                <span class="subterms-label">TOGGLE INPUTS (ISOLATED):</span>
+                <div class="learning-toggles">
+                  <button id="btnToggleA" class="toggle-pin-btn" type="button" aria-pressed="false">
+                    Input A: <strong id="valInputA">0</strong>
+                  </button>
+                  <button id="btnToggleB" class="toggle-pin-btn" type="button" aria-pressed="false">
+                    Input B: <strong id="valInputB">0</strong>
+                  </button>
+                </div>
+              </div>
+
+              <!-- SVG Gate Representation -->
+              <div id="learningGateSvgWrapper" class="gate-svg-viewport">
+                <!-- Inline SVG rendered by logic.js -->
+              </div>
+
+              <!-- Boolean Equation -->
+              <div class="equation-box" style="margin-top:0.5rem;">
+                <span class="eq-label">EQUATION:</span>
+                <code id="learningGateEquation" class="eq-code">Y = A · B</code>
+              </div>
+
+              <!-- Gate DPCO Description -->
+              <div id="learningGateDesc" class="learning-desc-box">
+                Output is HIGH (1) only if BOTH inputs A and B are HIGH (1). Used for joint conditions and authorization interlocks.
+              </div>
+            </div>
+
+            <!-- Right: Dynamic Truth Table -->
+            <div class="learning-truth-card">
+              <div class="truth-header">
+                <h4>Dynamic Truth Table</h4>
+                <span class="truth-badge">Live Evaluated</span>
+              </div>
+              <div class="truth-table-container">
+                <table class="truth-table" id="learningTruthTable">
+                  <thead id="learningTruthThead">
+                    <tr>
+                      <th>A</th>
+                      <th>B</th>
+                      <th>Output (Y)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="learningTruthTbody">
+                    <!-- Truth table rows populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+              <div class="sandbox-guarantee">
+                <span style="color:#38bdf8;">&#128274; Sandbox Guarantee:</span> Toggling educational inputs in Learning Mode is strictly isolated and does not alter traffic lights, FSM state, or vehicle queues.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Directional Approach Queues & Congestion Heatmap -->
       <section class="panel" style="padding:1rem;" aria-label="Directional Approach Queues & Congestion">
         <div class="panel-header" style="margin-bottom:0.5rem;">
@@ -435,7 +589,8 @@
       <a href="docs/phase-7-remediation-report.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">Phase 7 Remediation</a>&bull;
       <a href="docs/phase-8-visual-audit.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">Phase 8 Visual Audit</a>&bull;
       <a href="docs/phase-8-remediation-report.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">Phase 8 Remediation</a>&bull;
-      <a href="docs/phase-9-acceptance-report.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">Phase 9 Acceptance Report</a>
+      <a href="docs/phase-9-acceptance-report.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">Phase 9 Acceptance Report</a>&bull;
+      <a href="docs/phase-10-logic-gate-workbench.md" target="_blank" style="color:var(--accent-blue); text-decoration:none; margin:0 5px;">Phase 10 Logic Workbench</a>
     </div>
   </footer>
 
@@ -444,6 +599,7 @@
   <script src="vehicles.js"></script>
   <script src="adaptive.js"></script>
   <script src="analytics.js"></script>
+  <script src="logic.js"></script>
   <script src="verify.js"></script>
   <script src="app.js"></script>
 </body>

@@ -15,12 +15,13 @@
       require('./fsm.js'),
       require('./vehicles.js'),
       require('./adaptive.js'),
-      require('./analytics.js')
+      require('./analytics.js'),
+      require('./logic.js')
     );
   } else {
-    root.FSMVerifier = factory(root.TrafficFSM, root.VehicleManager, root.AdaptiveController, root.TrafficAnalyticsEngine);
+    root.FSMVerifier = factory(root.TrafficFSM, root.VehicleManager, root.AdaptiveController, root.TrafficAnalyticsEngine, root.LogicEngine);
   }
-})(typeof self !== 'undefined' ? self : this, function (TrafficLightFSM, VehicleManager, AdaptiveController, TrafficAnalyticsEngine) {
+})(typeof self !== 'undefined' ? self : this, function (TrafficLightFSM, VehicleManager, AdaptiveController, TrafficAnalyticsEngine, LogicEngine) {
   'use strict';
 
   function runVerificationSuite() {
@@ -1175,6 +1176,211 @@
       }
     }
 
+    // =========================================================================
+    // PHASE 10 VERIFICATION (DPCO Digital Logic Gate Workbench & Circuits)
+    // =========================================================================
+    if (LogicEngine) {
+      const {
+        GATES,
+        GATE_METADATA,
+        evaluateGate,
+        evaluateNSGreenCircuit,
+        evaluateEWGreenCircuit,
+        evaluateSafetyHaltCircuit,
+        evaluateVehicleEntryCircuit,
+        evaluateEmergencyHoldCircuit,
+        evaluateInvariantDefenseCircuit,
+        getLogicTelemetry,
+        LearningModeState
+      } = LogicEngine;
+
+      // --- TEST 55: Phase 10 - Standard 7-Gate Truth Table Verification across All 2^n Combinations ---
+      {
+        let allTablesPassed = true;
+        const gateTests = [
+          { gate: GATES.AND,  expected: [0, 0, 0, 1] },
+          { gate: GATES.OR,   expected: [0, 1, 1, 1] },
+          { gate: GATES.NOT,  expected: [1, 0] },
+          { gate: GATES.NAND, expected: [1, 1, 1, 0] },
+          { gate: GATES.NOR,  expected: [1, 0, 0, 0] },
+          { gate: GATES.XOR,  expected: [0, 1, 1, 0] },
+          { gate: GATES.XNOR, expected: [1, 0, 0, 1] }
+        ];
+
+        for (const gt of gateTests) {
+          const meta = GATE_METADATA[gt.gate];
+          for (let i = 0; i < meta.truthTable.length; i++) {
+            const row = meta.truthTable[i];
+            const evalOut = evaluateGate(gt.gate, row.a, row.b);
+            if (evalOut !== gt.expected[i] || row.y !== gt.expected[i]) {
+              allTablesPassed = false;
+            }
+          }
+        }
+
+        assert(
+          allTablesPassed,
+          'Phase 10: All 7 standard digital logic gates (AND, OR, NOT, NAND, NOR, XOR, XNOR) truth tables mathematically verified',
+          'Verified 26 total input/output state vectors across all 7 logic gates'
+        );
+      }
+
+      // --- TEST 56: Phase 10 - Circuit 1: North-South Green Authorization (NS_Green = S0 ∧ ¬AllRed ∧ ¬Fault) ---
+      {
+        const evalS0Normal = evaluateNSGreenCircuit({ s0: 1, allRed: 0, fault: 0 });
+        const evalS0Halt = evaluateNSGreenCircuit({ s0: 1, allRed: 1, fault: 0 });
+        const evalS0Fault = evaluateNSGreenCircuit({ s0: 1, allRed: 0, fault: 1 });
+        const evalS1Normal = evaluateNSGreenCircuit({ s0: 0, allRed: 0, fault: 0 });
+
+        assert(
+          evalS0Normal.output === 1 &&
+          evalS0Halt.output === 0 &&
+          evalS0Fault.output === 0 &&
+          evalS1Normal.output === 0,
+          'Phase 10: Circuit 1 (NS Green Authorization) authorizes GREEN strictly during S0 without All-Red or Fault',
+          `S0 Normal: ${evalS0Normal.output}, S0+AllRed: ${evalS0Halt.output}, S0+Fault: ${evalS0Fault.output}, S1: ${evalS1Normal.output}`
+        );
+      }
+
+      // --- TEST 57: Phase 10 - Circuit 2: East-West Green Authorization (EW_Green = S2 ∧ ¬AllRed ∧ ¬Fault) ---
+      {
+        const evalS2Normal = evaluateEWGreenCircuit({ s2: 1, allRed: 0, fault: 0 });
+        const evalS2Halt = evaluateEWGreenCircuit({ s2: 1, allRed: 1, fault: 0 });
+        const evalS2Fault = evaluateEWGreenCircuit({ s2: 1, allRed: 0, fault: 1 });
+        const evalS0Normal = evaluateEWGreenCircuit({ s2: 0, allRed: 0, fault: 0 });
+
+        assert(
+          evalS2Normal.output === 1 &&
+          evalS2Halt.output === 0 &&
+          evalS2Fault.output === 0 &&
+          evalS0Normal.output === 0,
+          'Phase 10: Circuit 2 (EW Green Authorization) authorizes GREEN strictly during S2 without All-Red or Fault',
+          `S2 Normal: ${evalS2Normal.output}, S2+AllRed: ${evalS2Halt.output}, S2+Fault: ${evalS2Fault.output}, S0: ${evalS0Normal.output}`
+        );
+      }
+
+      // --- TEST 58: Phase 10 - Circuit 3: All-Red Safety Interlock & Fault Detection (Halt = EmergencyAllRed ∨ InvariantViolation) ---
+      {
+        const normalSafe = evaluateSafetyHaltCircuit({ emergencyAllRed: 0, invariantViolation: 0 });
+        const opTriggered = evaluateSafetyHaltCircuit({ emergencyAllRed: 1, invariantViolation: 0 });
+        const faultTriggered = evaluateSafetyHaltCircuit({ emergencyAllRed: 0, invariantViolation: 1 });
+        const dualTriggered = evaluateSafetyHaltCircuit({ emergencyAllRed: 1, invariantViolation: 1 });
+
+        assert(
+          normalSafe.output === 0 &&
+          opTriggered.output === 1 &&
+          faultTriggered.output === 1 &&
+          dualTriggered.output === 1,
+          'Phase 10: Circuit 3 (Safety Interlock) asserts Halt if Operator Triggered OR Invariant Violation detected',
+          `Normal: ${normalSafe.output}, Operator All-Red: ${opTriggered.output}, Invariant Fault: ${faultTriggered.output}, Dual: ${dualTriggered.output}`
+        );
+      }
+
+      // --- TEST 59: Phase 10 - Circuit 4: Vehicle Entry Authorization (EntryGranted = SignalGreen ∧ ¬ConflictingOccupied) ---
+      {
+        const greenAndClear = evaluateVehicleEntryCircuit({ signalGreen: 1, conflictingOccupied: 0 });
+        const greenAndBlocked = evaluateVehicleEntryCircuit({ signalGreen: 1, conflictingOccupied: 1 });
+        const redAndClear = evaluateVehicleEntryCircuit({ signalGreen: 0, conflictingOccupied: 0 });
+        const redAndBlocked = evaluateVehicleEntryCircuit({ signalGreen: 0, conflictingOccupied: 1 });
+
+        assert(
+          greenAndClear.output === 1 &&
+          greenAndBlocked.output === 0 &&
+          redAndClear.output === 0 &&
+          redAndBlocked.output === 0,
+          'Phase 10: Circuit 4 (Vehicle Entry Permission) grants entry strictly on Green light with clear conflict box',
+          `Green+Clear: ${greenAndClear.output}, Green+Blocked: ${greenAndBlocked.output}, Red+Clear: ${redAndClear.output}, Red+Blocked: ${redAndBlocked.output}`
+        );
+      }
+
+      // --- TEST 60: Phase 10 - Circuit 5: Emergency Priority Hold Interlock (PriorityHold = ActiveEmergency ∧ TargetGreenActive ∧ ¬VehicleCleared) ---
+      {
+        const holdActive = evaluateEmergencyHoldCircuit({ activeEmergency: 1, targetGreenActive: 1, vehicleCleared: 0 });
+        const holdCleared = evaluateEmergencyHoldCircuit({ activeEmergency: 1, targetGreenActive: 1, vehicleCleared: 1 });
+        const wrongPhase = evaluateEmergencyHoldCircuit({ activeEmergency: 1, targetGreenActive: 0, vehicleCleared: 0 });
+        const noEmergency = evaluateEmergencyHoldCircuit({ activeEmergency: 0, targetGreenActive: 1, vehicleCleared: 0 });
+
+        assert(
+          holdActive.output === 1 &&
+          holdCleared.output === 0 &&
+          wrongPhase.output === 0 &&
+          noEmergency.output === 0,
+          'Phase 10: Circuit 5 (Priority Hold Interlock) maintains hold while emergency vehicle approaches and releases on clearance',
+          `In Transit: ${holdActive.output}, Post-Clearance: ${holdCleared.output}, Yellow Phase: ${wrongPhase.output}, Idle: ${noEmergency.output}`
+        );
+      }
+
+      // --- TEST 61: Phase 10 - Circuit 6: Conflicting Green Invariant Defense ((NS_Green ∨ NS_Yellow) ∧ (EW_Green ∨ EW_Yellow)) ---
+      {
+        const safeS0 = evaluateInvariantDefenseCircuit({ nsGreen: 1, nsYellow: 0, ewGreen: 0, ewYellow: 0 });
+        const safeS1 = evaluateInvariantDefenseCircuit({ nsGreen: 0, nsYellow: 1, ewGreen: 0, ewYellow: 0 });
+        const safeS2 = evaluateInvariantDefenseCircuit({ nsGreen: 0, nsYellow: 0, ewGreen: 1, ewYellow: 0 });
+        const hazardDualGreen = evaluateInvariantDefenseCircuit({ nsGreen: 1, nsYellow: 0, ewGreen: 1, ewYellow: 0 });
+        const hazardDualActive = evaluateInvariantDefenseCircuit({ nsGreen: 0, nsYellow: 1, ewGreen: 1, ewYellow: 0 });
+
+        assert(
+          safeS0.output === 0 &&
+          safeS1.output === 0 &&
+          safeS2.output === 0 &&
+          hazardDualGreen.output === 1 &&
+          hazardDualActive.output === 1,
+          'Phase 10: Circuit 6 (Invariant Defense Monitor) trips Hazard strictly upon dual active or dual green conditions',
+          `Safe S0: ${safeS0.output}, Safe S1: ${safeS1.output}, Dual Green: ${hazardDualGreen.output}, Dual Active: ${hazardDualActive.output}`
+        );
+      }
+
+      // --- TEST 62: Phase 10 - Live Telemetry Bridge Fidelity & Signal Mapping ---
+      {
+        const fsmLive = new TrafficLightFSM();
+        const vmLive = new VehicleManager();
+        const tS0 = getLogicTelemetry(fsmLive, vmLive);
+
+        fsmLive.step(); // S1
+        fsmLive.step(); // S2
+        const tS2 = getLogicTelemetry(fsmLive, vmLive);
+
+        assert(
+          tS0.stateBits.isS0 === 1 &&
+          tS0.signalBits.nsGreen === 1 &&
+          tS0.circuits.NS_GREEN.output === 1 &&
+          tS0.circuits.EW_GREEN.output === 0 &&
+          tS2.stateBits.isS2 === 1 &&
+          tS2.signalBits.ewGreen === 1 &&
+          tS2.circuits.NS_GREEN.output === 0 &&
+          tS2.circuits.EW_GREEN.output === 1,
+          'Phase 10: Authoritative telemetry bridge extracts accurate live state and synchronizes circuit evaluations',
+          `S0 NS_Green: ${tS0.circuits.NS_GREEN.output}, S2 EW_Green: ${tS2.circuits.EW_GREEN.output}`
+        );
+      }
+
+      // --- TEST 63: Phase 10 - Learning Mode Sandboxing & Zero Side-Effect Guarantee ---
+      {
+        const fsmLive = new TrafficLightFSM();
+        const vmLive = new VehicleManager();
+        vmLive.spawnVehicle('north', 'CAR');
+        const initialFsmState = fsmLive.getCurrentState();
+        const initialQueueCount = vmLive.lanes.north.length;
+
+        const learning = new LearningModeState();
+        learning.setGate(GATES.XOR);
+        learning.toggleInputA(); // A = 1
+        learning.toggleInputB(); // B = 1 -> XOR output = 0
+        const st1 = learning.getState();
+
+        learning.toggleInputB(); // B = 0 -> XOR output = 1
+        const st2 = learning.getState();
+
+        assert(
+          st1.output === 0 &&
+          st2.output === 1 &&
+          fsmLive.getCurrentState() === initialFsmState &&
+          vmLive.lanes.north.length === initialQueueCount,
+          'Phase 10: Learning Mode state changes are completely sandboxed and produce zero side-effects on traffic simulation',
+          `XOR(1,1)=${st1.output}, XOR(1,0)=${st2.output}, Unaltered FSM: ${fsmLive.getCurrentState()}, Unaltered Queue: ${vmLive.lanes.north.length}`
+        );
+      }
+    }
+
     return results;
   }
 
@@ -1182,7 +1388,7 @@
   if (typeof process !== 'undefined' && process.argv && require.main === module) {
     console.log('====================================================');
     console.log(' Traffic Light Controller Verification Suite');
-    console.log(' Phase 1 to Phase 7 Full Formal Verification & Reliability');
+    console.log(' Phase 1 to Phase 10 Full Formal Verification & DPCO Logic');
     console.log('====================================================');
     const results = runVerificationSuite();
     results.details.forEach(item => {

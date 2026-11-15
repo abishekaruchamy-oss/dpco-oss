@@ -30,6 +30,13 @@
   let wasRunningBeforeHalt = false;
   let lastChartUpdate = 0;
 
+  // Phase 10: Logic Workbench State
+  let logicEngine = null;
+  let learningState = null;
+  let currentLogicMode = 'LIVE'; // 'LIVE' | 'LEARNING'
+  let currentLiveCircuit = 'NS_GREEN'; // 'NS_GREEN' | 'EW_GREEN' | 'SAFETY_HALT' | 'VEHICLE_ENTRY' | 'EMERGENCY_HOLD' | 'INVARIANT_DEFENSE'
+  let lastLogicRenderTime = 0;
+
   // DOM Elements cache
   const elements = {
     // Buttons & Controls
@@ -153,7 +160,36 @@
     testSummaryBadge: document.getElementById('testSummaryBadge'),
 
     // Log
-    eventLog: document.getElementById('eventLog')
+    eventLog: document.getElementById('eventLog'),
+
+    // Phase 10: Logic Workbench Elements
+    panelLogicWorkbench: document.getElementById('panelLogicWorkbench'),
+    logicSimStatusBadge: document.getElementById('logicSimStatusBadge'),
+    tabModeLive: document.getElementById('tabModeLive'),
+    tabModeLearning: document.getElementById('tabModeLearning'),
+    logicLiveModeContainer: document.getElementById('logicLiveModeContainer'),
+    logicLearningModeContainer: document.getElementById('logicLearningModeContainer'),
+    circuitButtons: document.querySelectorAll('.circuit-btn'),
+    liveCircuitTitle: document.getElementById('liveCircuitTitle'),
+    liveCircuitAnalogy: document.getElementById('liveCircuitAnalogy'),
+    liveCircuitStatusPill: document.getElementById('liveCircuitStatusPill'),
+    liveCircuitEquation: document.getElementById('liveCircuitEquation'),
+    liveCircuitSvgWrapper: document.getElementById('liveCircuitSvgWrapper'),
+    liveCircuitInputsList: document.getElementById('liveCircuitInputsList'),
+    liveCircuitExplanation: document.getElementById('liveCircuitExplanation'),
+    gateButtons: document.querySelectorAll('.gate-btn'),
+    learningGateTitle: document.getElementById('learningGateTitle'),
+    learningGateOutputPill: document.getElementById('learningGateOutputPill'),
+    btnToggleA: document.getElementById('btnToggleA'),
+    btnToggleB: document.getElementById('btnToggleB'),
+    valInputA: document.getElementById('valInputA'),
+    valInputB: document.getElementById('valInputB'),
+    learningGateSvgWrapper: document.getElementById('learningGateSvgWrapper'),
+    learningGateEquation: document.getElementById('learningGateEquation'),
+    learningGateDesc: document.getElementById('learningGateDesc'),
+    learningTruthTable: document.getElementById('learningTruthTable'),
+    learningTruthThead: document.getElementById('learningTruthThead'),
+    learningTruthTbody: document.getElementById('learningTruthTbody')
   };
 
   /**
@@ -237,6 +273,7 @@
     renderStateTable();
     updateUI();
     attachEventListeners();
+    initLogicWorkbench();
     logEvent('Controller initialized. Initial state: ' + meta.code + ' (' + meta.title + ')');
 
     // Run initial verification to assert startup health
@@ -313,6 +350,32 @@
             runAutomatedVerification(true);
           }, 300);
         }
+        if (urlParams.get('logic_mode')) {
+          const lm = urlParams.get('logic_mode').toUpperCase();
+          setTimeout(() => {
+            if (lm === 'LEARNING' && elements.tabModeLearning) {
+              elements.tabModeLearning.click();
+            } else if (elements.tabModeLive) {
+              elements.tabModeLive.click();
+            }
+          }, 200);
+        }
+        if (urlParams.get('circuit')) {
+          const c = urlParams.get('circuit').toUpperCase();
+          setTimeout(() => {
+            if (window.TrafficApp && window.TrafficApp.selectLiveCircuit) {
+              window.TrafficApp.selectLiveCircuit(c);
+            }
+          }, 300);
+        }
+        if (urlParams.get('gate')) {
+          const g = urlParams.get('gate').toUpperCase();
+          setTimeout(() => {
+            if (window.TrafficApp && window.TrafficApp.selectLearningGate) {
+              window.TrafficApp.selectLearningGate(g);
+            }
+          }, 300);
+        }
       }
     } catch (e) {
       // Fallback
@@ -324,6 +387,10 @@
       get vehicleManager() { return vehicleManager; },
       get adaptiveController() { return adaptiveController; },
       get analyticsEngine() { return analyticsEngine; },
+      get logicEngine() { return logicEngine; },
+      get learningState() { return learningState; },
+      get currentLogicMode() { return currentLogicMode; },
+      get currentLiveCircuit() { return currentLiveCircuit; },
       get simStatus() { return simStatus; },
       get remainingSeconds() { return remainingSeconds; },
       get elapsedSeconds() { return elapsedSeconds; },
@@ -350,6 +417,53 @@
         if (elements.modeSelect) elements.modeSelect.value = m;
         updateAdaptiveUI();
       },
+      setLogicMode(mode) {
+        const m = mode.toUpperCase();
+        if (m === 'LEARNING') {
+          if (elements.tabModeLearning) elements.tabModeLearning.click();
+        } else {
+          if (elements.tabModeLive) elements.tabModeLive.click();
+        }
+      },
+      selectLiveCircuit(circuitId) {
+        if (logicEngine && logicEngine.CONTROLLER_CIRCUITS[circuitId]) {
+          currentLiveCircuit = circuitId;
+          if (elements.circuitButtons) {
+            elements.circuitButtons.forEach((b) => {
+              if (b.getAttribute('data-circuit') === circuitId) b.classList.add('active');
+              else b.classList.remove('active');
+            });
+          }
+          updateLogicWorkbenchUI(true);
+        }
+      },
+      selectLearningGate(gate) {
+        if (learningState && logicEngine.GATES[gate]) {
+          learningState.setGate(gate);
+          if (elements.gateButtons) {
+            elements.gateButtons.forEach((b) => {
+              if (b.getAttribute('data-gate') === gate) b.classList.add('active');
+              else b.classList.remove('active');
+            });
+          }
+          renderLearningModeUI();
+        }
+      },
+      toggleLearningInputA() {
+        if (learningState) {
+          learningState.toggleInputA();
+          renderLearningModeUI();
+        }
+      },
+      toggleLearningInputB() {
+        if (learningState) {
+          learningState.toggleInputB();
+          renderLearningModeUI();
+        }
+      },
+      getLogicTelemetry() {
+        return logicEngine ? logicEngine.getLogicTelemetry(fsm, vehicleManager, adaptiveController) : null;
+      },
       startSimulation,
       pauseSimulation,
       resetSimulation,
@@ -375,6 +489,9 @@
       vehicleManager.update(dt, fsm ? fsm.getSignals() : null, isPaused);
       updateAnalyticsUI();
     }
+
+    // Keep Live Logic Workbench synchronized with moving vehicles and signals
+    updateLogicWorkbenchUI(false);
 
     requestAnimationFrame(animationLoop);
   }
@@ -503,6 +620,316 @@
           }
         }
       });
+    }
+  }
+
+  // =========================================================================
+  // PHASE 10: DPCO DIGITAL LOGIC GATE WORKBENCH & CIRCUIT LOGIC
+  // =========================================================================
+
+  /**
+   * Initialize Digital Logic Gate Workbench
+   */
+  function initLogicWorkbench() {
+    if (!window.LogicEngine) return;
+    logicEngine = window.LogicEngine;
+    learningState = new logicEngine.LearningModeState();
+
+    // Mode Switching Tabs
+    if (elements.tabModeLive && elements.tabModeLearning) {
+      elements.tabModeLive.addEventListener('click', () => {
+        currentLogicMode = 'LIVE';
+        elements.tabModeLive.classList.add('active');
+        elements.tabModeLearning.classList.remove('active');
+        elements.tabModeLive.setAttribute('aria-selected', 'true');
+        elements.tabModeLearning.setAttribute('aria-selected', 'false');
+        if (elements.logicLiveModeContainer) elements.logicLiveModeContainer.style.display = 'block';
+        if (elements.logicLearningModeContainer) elements.logicLearningModeContainer.style.display = 'none';
+        updateLogicWorkbenchUI(true);
+      });
+
+      elements.tabModeLearning.addEventListener('click', () => {
+        currentLogicMode = 'LEARNING';
+        elements.tabModeLearning.classList.add('active');
+        elements.tabModeLive.classList.remove('active');
+        elements.tabModeLearning.setAttribute('aria-selected', 'true');
+        elements.tabModeLive.setAttribute('aria-selected', 'false');
+        if (elements.logicLearningModeContainer) elements.logicLearningModeContainer.style.display = 'block';
+        if (elements.logicLiveModeContainer) elements.logicLiveModeContainer.style.display = 'none';
+        renderLearningModeUI();
+      });
+    }
+
+    // Live Circuit Selector Buttons
+    if (elements.circuitButtons) {
+      elements.circuitButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const circuitId = btn.getAttribute('data-circuit');
+          if (circuitId && logicEngine.CONTROLLER_CIRCUITS[circuitId]) {
+            currentLiveCircuit = circuitId;
+            elements.circuitButtons.forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            updateLogicWorkbenchUI(true);
+          }
+        });
+      });
+    }
+
+    // Learning Mode Gate Selector Buttons
+    if (elements.gateButtons) {
+      elements.gateButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const gate = btn.getAttribute('data-gate');
+          if (gate && logicEngine.GATES[gate]) {
+            learningState.setGate(gate);
+            elements.gateButtons.forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderLearningModeUI();
+          }
+        });
+      });
+    }
+
+    // Learning Mode Input Toggles (Guaranteed Sandboxed - Isolated from simulation)
+    if (elements.btnToggleA) {
+      elements.btnToggleA.addEventListener('click', () => {
+        learningState.toggleInputA();
+        renderLearningModeUI();
+      });
+    }
+    if (elements.btnToggleB) {
+      elements.btnToggleB.addEventListener('click', () => {
+        learningState.toggleInputB();
+        renderLearningModeUI();
+      });
+    }
+
+    updateLogicWorkbenchUI(true);
+    renderLearningModeUI();
+  }
+
+  /**
+   * Render Learning Mode UI (Completely Isolated from Traffic Controller)
+   */
+  function renderLearningModeUI() {
+    if (!learningState || !logicEngine) return;
+    const st = learningState.getState();
+    const meta = st.metadata;
+
+    // Header & Pill
+    if (elements.learningGateTitle) {
+      elements.learningGateTitle.textContent = `${meta.name}`;
+    }
+    if (elements.learningGateOutputPill) {
+      if (st.output === 1) {
+        elements.learningGateOutputPill.className = 'circuit-status-pill pill-high';
+        elements.learningGateOutputPill.textContent = 'OUTPUT Y: 1 (HIGH)';
+      } else {
+        elements.learningGateOutputPill.className = 'circuit-status-pill pill-low';
+        elements.learningGateOutputPill.textContent = 'OUTPUT Y: 0 (LOW)';
+      }
+    }
+
+    // Toggles A & B
+    if (elements.valInputA) elements.valInputA.textContent = st.inputA;
+    if (elements.btnToggleA) {
+      elements.btnToggleA.classList.toggle('active', st.inputA === 1);
+      elements.btnToggleA.setAttribute('aria-pressed', st.inputA === 1 ? 'true' : 'false');
+    }
+
+    if (elements.btnToggleB) {
+      if (meta.inputs === 1) {
+        // NOT gate only has input A
+        elements.btnToggleB.style.display = 'none';
+      } else {
+        elements.btnToggleB.style.display = 'inline-flex';
+        if (elements.valInputB) elements.valInputB.textContent = st.inputB;
+        elements.btnToggleB.classList.toggle('active', st.inputB === 1);
+        elements.btnToggleB.setAttribute('aria-pressed', st.inputB === 1 ? 'true' : 'false');
+      }
+    }
+
+    // Render Gate SVG
+    if (elements.learningGateSvgWrapper) {
+      elements.learningGateSvgWrapper.innerHTML = logicEngine.renderSingleGateSvg(
+        st.selectedGate,
+        st.inputA,
+        st.inputB,
+        st.output
+      );
+    }
+
+    // Equation and Descriptions
+    if (elements.learningGateEquation) {
+      elements.learningGateEquation.textContent = meta.expression;
+    }
+    if (elements.learningGateDesc) {
+      elements.learningGateDesc.innerHTML = `<strong>${meta.description}</strong><br><span style="color:#64748b; font-size:0.7rem; margin-top:0.25rem; display:block;">DPCO Context: ${meta.dpcoContext}</span>`;
+    }
+
+    // Render Truth Table
+    renderTruthTable(meta, st);
+  }
+
+  /**
+   * Render Dynamic Truth Table with Active Input Row Highlighted
+   */
+  function renderTruthTable(meta, st) {
+    if (!elements.learningTruthThead || !elements.learningTruthTbody) return;
+
+    if (meta.inputs === 1) {
+      elements.learningTruthThead.innerHTML = `
+        <tr>
+          <th>Input A</th>
+          <th>Output (Y = A̅)</th>
+        </tr>
+      `;
+    } else {
+      elements.learningTruthThead.innerHTML = `
+        <tr>
+          <th>Input A</th>
+          <th>Input B</th>
+          <th>Output (Y)</th>
+        </tr>
+      `;
+    }
+
+    elements.learningTruthTbody.innerHTML = '';
+    meta.truthTable.forEach((row, idx) => {
+      const tr = document.createElement('tr');
+      const isActive = (idx === st.activeRowIndex);
+      if (isActive) {
+        tr.className = 'active-truth-row';
+      }
+
+      if (meta.inputs === 1) {
+        tr.innerHTML = `
+          <td>${row.a}</td>
+          <td style="color:${row.y ? '#4ade80' : '#94a3b8'}; font-weight:${row.y ? '700' : '400'};">${row.y}</td>
+        `;
+      } else {
+        tr.innerHTML = `
+          <td>${row.a}</td>
+          <td>${row.b}</td>
+          <td style="color:${row.y ? '#4ade80' : '#94a3b8'}; font-weight:${row.y ? '700' : '400'};">${row.y}</td>
+        `;
+      }
+      elements.learningTruthTbody.appendChild(tr);
+    });
+  }
+
+  /**
+   * Update Logic Workbench UI with Authoritative Live Telemetry
+   */
+  function updateLogicWorkbenchUI(force = false) {
+    if (!logicEngine || !fsm) return;
+
+    // Simulation status badge
+    if (elements.logicSimStatusBadge) {
+      if (fsm.isAllRedHalt()) {
+        elements.logicSimStatusBadge.className = 'badge badge-status paused';
+        elements.logicSimStatusBadge.textContent = 'ALL-RED HALT';
+      } else if (simStatus === SIM_STATUS.RUNNING) {
+        elements.logicSimStatusBadge.className = 'badge badge-status running';
+        elements.logicSimStatusBadge.textContent = 'LIVE CONTROLLER';
+      } else if (simStatus === SIM_STATUS.PAUSED) {
+        elements.logicSimStatusBadge.className = 'badge badge-status paused';
+        elements.logicSimStatusBadge.textContent = 'PAUSED';
+      } else {
+        elements.logicSimStatusBadge.className = 'badge badge-status stopped';
+        elements.logicSimStatusBadge.textContent = 'STOPPED';
+      }
+    }
+
+    // Only re-render live circuit SVG if in LIVE mode
+    if (currentLogicMode !== 'LIVE') return;
+
+    const now = performance.now();
+    // Throttle live SVG redraw to ~15-20 FPS (every 50ms) unless forced
+    if (!force && (now - lastLogicRenderTime < 50)) {
+      return;
+    }
+    lastLogicRenderTime = now;
+
+    // Authoritative Telemetry Snapshot
+    const telemetry = logicEngine.getLogicTelemetry(fsm, vehicleManager, adaptiveController);
+    const circMeta = logicEngine.CONTROLLER_CIRCUIT_METADATA[currentLiveCircuit];
+    if (!circMeta) return;
+
+    const circuitData = telemetry.circuits[currentLiveCircuit] || { output: 0, subTerms: {} };
+    const out = circuitData.output ? 1 : 0;
+
+    // Title & Analogy
+    if (elements.liveCircuitTitle) elements.liveCircuitTitle.textContent = circMeta.title;
+    if (elements.liveCircuitAnalogy) elements.liveCircuitAnalogy.textContent = circMeta.hardwareAnalogy;
+
+    // Status Pill
+    if (elements.liveCircuitStatusPill) {
+      if (currentLiveCircuit === 'SAFETY_HALT' || currentLiveCircuit === 'INVARIANT_DEFENSE') {
+        if (out === 1) {
+          elements.liveCircuitStatusPill.className = 'circuit-status-pill pill-halt';
+          elements.liveCircuitStatusPill.textContent = 'TRIP: ACTIVE (1)';
+        } else {
+          elements.liveCircuitStatusPill.className = 'circuit-status-pill pill-low';
+          elements.liveCircuitStatusPill.textContent = 'SECURE: LOW (0)';
+        }
+      } else {
+        if (out === 1) {
+          elements.liveCircuitStatusPill.className = 'circuit-status-pill pill-high';
+          elements.liveCircuitStatusPill.textContent = 'OUTPUT: HIGH (1)';
+        } else {
+          elements.liveCircuitStatusPill.className = 'circuit-status-pill pill-low';
+          elements.liveCircuitStatusPill.textContent = 'OUTPUT: LOW (0)';
+        }
+      }
+    }
+
+    // Equation
+    if (elements.liveCircuitEquation) {
+      elements.liveCircuitEquation.textContent = circMeta.booleanEquation;
+    }
+
+    // Render Circuit SVG
+    if (elements.liveCircuitSvgWrapper) {
+      elements.liveCircuitSvgWrapper.innerHTML = logicEngine.renderControllerCircuitSvg(
+        currentLiveCircuit,
+        telemetry
+      );
+    }
+
+    // Render Subterm Pills
+    if (elements.liveCircuitInputsList) {
+      elements.liveCircuitInputsList.innerHTML = '';
+      circMeta.inputs.forEach((inp) => {
+        let val = 0;
+        if (inp.id === 's0') val = telemetry.stateBits.isS0;
+        else if (inp.id === 's2') val = telemetry.stateBits.isS2;
+        else if (inp.id === 'allRed' || inp.id === 'emergencyAllRed') val = telemetry.stateBits.isAllRed;
+        else if (inp.id === 'fault' || inp.id === 'invariantViolation') val = telemetry.safety.violation;
+        else if (inp.id === 'signalGreen') val = (currentLiveCircuit === 'EW_GREEN' ? telemetry.signalBits.ewGreen : telemetry.signalBits.nsGreen);
+        else if (inp.id === 'conflictingOccupied') val = (currentLiveCircuit === 'EW_GREEN' ? telemetry.conflictOccupancy.ew : telemetry.conflictOccupancy.ns);
+        else if (inp.id === 'activeEmergency') val = telemetry.emergency.active;
+        else if (inp.id === 'targetGreenActive') val = telemetry.emergency.targetGreenActive;
+        else if (inp.id === 'vehicleCleared') val = telemetry.emergency.cleared;
+        else if (inp.id === 'nsActive') val = (telemetry.signalBits.nsGreen || telemetry.signalBits.nsYellow) ? 1 : 0;
+        else if (inp.id === 'ewActive') val = (telemetry.signalBits.ewGreen || telemetry.signalBits.ewYellow) ? 1 : 0;
+
+        const pill = document.createElement('span');
+        pill.className = `subterm-pill ${val ? 'active' : ''}`;
+        pill.innerHTML = `<span>${inp.label}:</span> <strong>${val}</strong>`;
+        elements.liveCircuitInputsList.appendChild(pill);
+      });
+    }
+
+    // Explanation Box
+    if (elements.liveCircuitExplanation) {
+      elements.liveCircuitExplanation.innerHTML = `
+        <strong>Operational Rationale:</strong> ${circMeta.description}
+        <div style="margin-top:0.35rem; color:#64748b; font-size:0.71rem;">
+          Gates Employed: <span style="color:#94a3b8;">${circMeta.gatesUsed.join(' + ')}</span> &bull; 
+          Evaluated via real-time FSM state register and sensor inputs.
+        </div>
+      `;
     }
   }
 
@@ -782,6 +1209,9 @@
 
     // Keep Adaptive UI synchronized with authoritative snapshot
     updateAdaptiveUI();
+
+    // Keep Logic Workbench synchronized with authoritative snapshot
+    updateLogicWorkbenchUI(true);
 
     // Status Badge
     updateStatusBadge();

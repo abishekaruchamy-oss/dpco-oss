@@ -1584,3 +1584,525 @@ body {
     gap: 0.35rem;
   }
 }
+
+/* ==========================================================================
+   PHASE 10: DPCO DIGITAL LOGIC GATE WORKBENCH & CIRCUIT STYLES
+   ========================================================================== */
+
+.logic-workbench-panel {
+  padding: 1.15rem;
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), 0 0 1px rgba(56, 189, 248, 0.2);
+}
+
+.logic-workbench-header {
+  margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.logic-workbench-subtitle {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+  letter-spacing: 0.02em;
+}
+
+.logic-header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.logic-intro-text {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  line-height: 1.45;
+  background: rgba(15, 23, 42, 0.7);
+  border-left: 3px solid #38bdf8;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0 6px 6px 0;
+  margin: 0.5rem 0 0.85rem 0;
+}
+
+/* Mode Switcher Tabs */
+.logic-mode-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+  background: #090d1a;
+  padding: 0.25rem;
+  border-radius: 8px;
+  border: 1px solid #1e293b;
+}
+
+.logic-tab-btn {
+  flex: 1;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #94a3b8;
+  background: transparent;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.logic-tab-btn:hover {
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.logic-tab-btn.active {
+  background: #1e293b;
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.logic-tab-btn .tab-icon {
+  font-size: 0.9rem;
+}
+
+/* Selector Button Bars */
+.circuit-selector-bar,
+.gate-selector-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.circuit-btn,
+.gate-btn {
+  background: #0b1329;
+  border: 1px solid #1e293b;
+  color: #94a3b8;
+  border-radius: 5px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.73rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.circuit-btn:hover,
+.gate-btn:hover {
+  border-color: #38bdf8;
+  color: #f1f5f9;
+  background: #0f1c3f;
+}
+
+.circuit-btn.active,
+.gate-btn.active {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+}
+
+/* Circuit & Learning Cards */
+.circuit-card,
+.learning-circuit-card,
+.learning-truth-card {
+  background: #090e1c;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.circuit-card-header,
+.learning-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.circuit-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.circuit-analogy {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+  font-style: italic;
+}
+
+.circuit-status-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.pill-high {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.25);
+}
+
+.pill-low {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border: 1px solid #475569;
+}
+
+.pill-halt {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+  border: 1px solid #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+}
+
+/* Boolean Equation Box */
+.equation-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  background: #030712;
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.eq-label {
+  font-size: 0.65rem;
+  color: #6b7280;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
+}
+
+.eq-code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+/* SVG Schematic Viewports */
+.circuit-svg-viewport,
+.gate-svg-viewport {
+  background: #030712;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  padding: 0.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: auto;
+  min-height: 120px;
+}
+
+.circuit-schematic-svg {
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  display: block;
+}
+
+.gate-workbench-svg {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  display: block;
+}
+
+/* Wire Animations */
+@keyframes wireFlow {
+  from {
+    stroke-dashoffset: 18;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.logic-wire-high {
+  stroke-dasharray: 6 3;
+  animation: wireFlow 1.2s linear infinite;
+  filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.5));
+}
+
+.logic-wire-low {
+  stroke-dasharray: none;
+  opacity: 0.45;
+}
+
+/* SVG Typography */
+.gate-pin-label {
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  fill: #94a3b8;
+  font-weight: 600;
+}
+
+.gate-center-type {
+  font-family: var(--font-sans);
+  font-size: 8.5px;
+  fill: #e2e8f0;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.circ-pin-text {
+  font-family: var(--font-mono);
+  font-size: 6.8px;
+  fill: #94a3b8;
+}
+
+.circ-gate-label {
+  font-family: var(--font-mono);
+  font-size: 7.8px;
+  fill: #cbd5e1;
+  font-weight: 700;
+}
+
+.circ-out-text {
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  fill: #cbd5e1;
+}
+
+/* Subterms and Signals */
+.circuit-subterms-bar {
+  margin-top: 0.65rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.subterms-label {
+  font-size: 0.66rem;
+  color: #64748b;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.subterms-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.subterm-pill {
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  padding: 0.18rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid #334155;
+  background: #0b1329;
+  color: #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.subterm-pill.active {
+  border-color: #38bdf8;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.subterm-pill.danger {
+  border-color: #ef4444;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Circuit Educational Explanation */
+.circuit-explanation {
+  margin-top: 0.65rem;
+  font-size: 0.77rem;
+  color: #94a3b8;
+  line-height: 1.45;
+  background: #070d1e;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  padding: 0.55rem 0.75rem;
+}
+
+/* Learning Mode Specifics */
+.learning-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.learning-inputs-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.learning-toggles {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.toggle-pin-btn {
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  border-radius: 5px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toggle-pin-btn:hover {
+  border-color: #38bdf8;
+  color: #fff;
+}
+
+.toggle-pin-btn.active {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
+}
+
+.learning-desc-box {
+  margin-top: 0.5rem;
+  font-size: 0.74rem;
+  color: #94a3b8;
+  line-height: 1.4;
+  background: #070d1e;
+  border: 1px solid #1e293b;
+  border-radius: 5px;
+  padding: 0.45rem 0.65rem;
+}
+
+/* Dynamic Truth Table */
+.truth-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.truth-header h4 {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0;
+}
+
+.truth-badge {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #38bdf8;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.truth-table-container {
+  overflow-x: auto;
+}
+
+.truth-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  text-align: center;
+}
+
+.truth-table th {
+  background: #090e1c;
+  color: #94a3b8;
+  border-bottom: 1px solid #1e293b;
+  padding: 0.4rem 0.5rem;
+  font-weight: 600;
+}
+
+.truth-table td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid #141e33;
+  color: #cbd5e1;
+}
+
+.truth-table tr.active-truth-row td {
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+  font-weight: 700;
+  border-top: 1px solid #38bdf8;
+  border-bottom: 1px solid #38bdf8;
+}
+
+.sandbox-guarantee {
+  margin-top: 0.65rem;
+  font-size: 0.68rem;
+  color: #64748b;
+  line-height: 1.35;
+  border-top: 1px dashed #1e293b;
+  padding-top: 0.5rem;
+}
+
+/* Responsive Overrides */
+@media (max-width: 900px) {
+  .learning-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .logic-workbench-panel {
+    padding: 0.75rem;
+  }
+
+  .circuit-btn,
+  .gate-btn {
+    font-size: 0.68rem;
+    padding: 0.25rem 0.45rem;
+  }
+
+  .logic-tab-btn {
+    font-size: 0.72rem;
+    padding: 0.4rem 0.5rem;
+  }
+
+  .circuit-title {
+    font-size: 0.84rem;
+  }
+
+  .eq-code {
+    font-size: 0.74rem;
+  }
+}
+

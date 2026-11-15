@@ -644,9 +644,13 @@ async function runAcceptanceTests() {
 
   } finally {
     cdp.close();
-    chromeProcess.kill('SIGTERM');
+    chromeProcess.kill('SIGKILL');
     await new Promise((r) => setTimeout(r, 1000));
-    fs.rmSync(userDataDir, { recursive: true, force: true });
+    try {
+      fs.rmSync(userDataDir, { recursive: true, force: true });
+    } catch (e) {
+      // Ignore Windows temp lock
+    }
     console.log('\n[CLEANUP] Chrome process terminated and temporary profile purged.');
   }
 
