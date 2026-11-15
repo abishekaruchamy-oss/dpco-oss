@@ -294,10 +294,71 @@
             }
           }, 400);
         }
+        if (urlParams.get('dispatch')) {
+          const vType = urlParams.get('dispatch').toUpperCase();
+          const dDir = (urlParams.get('dir') || 'north').toLowerCase();
+          setTimeout(() => {
+            if (vehicleManager && ['AMBULANCE', 'FIRE_ENGINE', 'POLICE'].includes(vType)) {
+              vehicleManager.spawnEmergencyVehicle(dDir, vType);
+            }
+          }, 400);
+        }
+        if (urlParams.get('allred') === 'true') {
+          setTimeout(() => {
+            toggleAllRedHalt();
+          }, 400);
+        }
+        if (urlParams.get('verify') === 'true') {
+          setTimeout(() => {
+            runAutomatedVerification(true);
+          }, 300);
+        }
       }
     } catch (e) {
       // Fallback
     }
+
+    // Expose application instance for E2E acceptance testing and inspection
+    window.TrafficApp = {
+      get fsm() { return fsm; },
+      get vehicleManager() { return vehicleManager; },
+      get adaptiveController() { return adaptiveController; },
+      get analyticsEngine() { return analyticsEngine; },
+      get simStatus() { return simStatus; },
+      get remainingSeconds() { return remainingSeconds; },
+      get elapsedSeconds() { return elapsedSeconds; },
+      get speedMultiplier() { return speedMultiplier; },
+      setSpeedMultiplier(s) {
+        speedMultiplier = parseFloat(s) || 1;
+        if (elements.speedSelect) elements.speedSelect.value = String(speedMultiplier);
+        if (simStatus === SIM_STATUS.RUNNING) {
+          clearInterval(timerInterval);
+          timerInterval = setInterval(tick, Math.round(1000 / speedMultiplier));
+        }
+      },
+      setDensity(mode) {
+        const m = mode.toUpperCase();
+        if (vehicleManager) vehicleManager.setDensityMode(m);
+        if (elements.densitySelect) elements.densitySelect.value = m;
+        if (elements.densityBadge) {
+          elements.densityBadge.textContent = `Mode: ${m.charAt(0) + m.slice(1).toLowerCase()}`;
+        }
+      },
+      setTimingMode(mode) {
+        const m = mode.toUpperCase();
+        if (adaptiveController) adaptiveController.setMode(m);
+        if (elements.modeSelect) elements.modeSelect.value = m;
+        updateAdaptiveUI();
+      },
+      startSimulation,
+      pauseSimulation,
+      resetSimulation,
+      stepSimulation: manualStep,
+      manualStep,
+      toggleAllRedHalt,
+      handleAllRedHalt: toggleAllRedHalt,
+      handleEmergencyCleared
+    };
   }
 
   /**
@@ -370,7 +431,7 @@
     }
     if (elements.statEmergencyCount) {
       const clearedCount = analyticsEngine
-        ? analyticsEngine.getEmergencyMetrics().totalCleared
+        ? analyticsEngine.getEmergencyStats().totalCleared
         : (vehicleManager ? vehicleManager.emergencyEvents.filter(e => e.cleared).length : 0);
       elements.statEmergencyCount.textContent = clearedCount;
     }

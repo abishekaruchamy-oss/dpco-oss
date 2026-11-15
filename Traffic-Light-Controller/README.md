@@ -33,7 +33,9 @@ Traffic-Light-Controller/
     ├── phase-7-remediation-report.md # Phase 7 remediation report & 18-scenario verification proofs
     ├── phase-8-visual-audit.md    # Phase 8 visual and UX defect audit
     ├── phase-8-remediation-report.md # Phase 8 remediation report & balanced UI architecture
-    └── phase-8-evidence/          # Phase 8 headless browser screenshot evidence (10 images)
+    ├── phase-8-evidence/          # Phase 8 headless browser screenshot evidence (10 images)
+    ├── phase-9-acceptance-report.md # Phase 9 independent end-to-end acceptance testing report
+    └── phase-9-evidence/          # Phase 9 browser acceptance screenshot evidence (17 images)
 ```
 
 ---
@@ -54,6 +56,7 @@ For exhaustive technical references, inspect the dedicated documentation manuals
 | **Phase 7 Remediation** | [`docs/phase-7-remediation-report.md`](./docs/phase-7-remediation-report.md) | Remediation report, architecture updates, and verification results across all 18 operational scenarios. |
 | **Phase 8 Visual Audit** | [`docs/phase-8-visual-audit.md`](./docs/phase-8-visual-audit.md) | Visual UI audit, UI/UX defect analysis (DEF-UI-01 through DEF-UI-07), and baseline screenshots. |
 | **Phase 8 Remediation** | [`docs/phase-8-remediation-report.md`](./docs/phase-8-remediation-report.md) | Balanced dashboard architecture, authoritative demand snapshot, crosswalk geometry, and 10 screenshot proofs. |
+| **Phase 9 Acceptance Report** | [`docs/phase-9-acceptance-report.md`](./docs/phase-9-acceptance-report.md) | Independent end-to-end browser acceptance report across Scenarios A-H, 17 screenshot captures, and demonstration readiness. |
 
 ---
 

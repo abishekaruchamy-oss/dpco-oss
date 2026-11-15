@@ -106,6 +106,10 @@
       };
     }
 
+    getEmergencyMetrics() {
+      return this.getEmergencyStats();
+    }
+
     /**
      * Generate an SVG sparkline graph showing rolling queue levels (NS vs EW)
      * @param {number} [width=320]

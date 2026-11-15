@@ -28,6 +28,7 @@ An advanced, browser-native **Intelligent Traffic Management System (ITMS)** bui
 - 🛠️ [Phase 7 Simulation Reliability & Remediation Report](./Traffic-Light-Controller/docs/phase-7-remediation-report.md)
 - 🎨 [Phase 8 Visual Audit & UX Defect Analysis](./Traffic-Light-Controller/docs/phase-8-visual-audit.md)
 - 🚀 [Phase 8 Complete Visual UI Audit & Remediation Report](./Traffic-Light-Controller/docs/phase-8-remediation-report.md)
+- 🏆 [Phase 9 Independent End-to-End Acceptance Report](./Traffic-Light-Controller/docs/phase-9-acceptance-report.md)
 
 #### Quick Start
 Open [`Traffic-Light-Controller/index.html`](./Traffic-Light-Controller/index.html) directly in any modern web browser.
