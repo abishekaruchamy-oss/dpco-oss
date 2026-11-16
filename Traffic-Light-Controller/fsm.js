@@ -16,7 +16,9 @@
   if (typeof module === 'object' && module.exports) {
     module.exports = factory();
   } else {
-    root.TrafficFSM = factory();
+    const exported = factory();
+    root.TrafficFSM = exported;
+    root.TrafficLightFSM = exported;
   }
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
@@ -211,6 +213,10 @@
      */
     getCurrentState() {
       return this.currentState;
+    }
+
+    getTransitionCount() {
+      return this.transitionCount;
     }
 
     /**

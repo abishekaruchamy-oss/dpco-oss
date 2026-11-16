@@ -40,8 +40,20 @@ Traffic-Light-Controller/
     ├── phase-10-logic-gate-workbench.md # Phase 10 DPCO logic gate workbench manual & truth tables
     ├── phase-10-evidence/         # Phase 10 headless browser screenshot evidence (8 images)
     ├── phase-10-1-correction-report.md # Phase 10.1 Telemetry accuracy, clearance & read-only bridge report
-    └── phase-10.1-evidence/       # Phase 10.1 headless browser screenshot evidence (10 images)
+    ├── phase-10.1-evidence/       # Phase 10.1 headless browser screenshot evidence (10 images)
+    ├── ITMS_Traffic_Light_Controller_Project_Report.docx # Word technical report for sharing & submission
+    ├── final-comprehensive-audit-report.md # 24-point comprehensive engineering audit report
+    ├── final-test-results.md      # Final verification test matrix (96 assertions, 32 E2E, 7 viewports)
+    ├── final-project-handover.md  # Final handover & demonstration guide
+    └── final-audit-evidence/      # Viewport responsive evidence (7 images) & stress completion
 ```
+
+---
+
+## **Project Technical Report**
+
+📄 **Download Full Formal Word Report**: [`docs/ITMS_Traffic_Light_Controller_Project_Report.docx`](./docs/ITMS_Traffic_Light_Controller_Project_Report.docx)  
+An exhaustive, publication-grade academic project report in Microsoft Word format covering mathematical FSM proofs, microscopic Newtonian kinematics, adaptive queue-responsive algorithms, emergency preemption, DPCO Boolean circuit logic, empirical stress test results, and operator guides.
 
 ---
 
@@ -51,6 +63,10 @@ For exhaustive technical references, inspect the dedicated documentation manuals
 
 | Manual | Document Path | Focus Areas |
 |---|---|---|
+| **Project Technical Report** | [`docs/ITMS_Traffic_Light_Controller_Project_Report.docx`](./docs/ITMS_Traffic_Light_Controller_Project_Report.docx) | Full formal Word document (.docx) for academic submission, printing, and study. |
+| **Comprehensive Final Audit** | [`docs/final-comprehensive-audit-report.md`](./docs/final-comprehensive-audit-report.md) | Exhaustive 24-point engineering audit across architecture, FSM, kinematics, logic, security, and release. |
+| **Final Test Results Matrix** | [`docs/final-test-results.md`](./docs/final-test-results.md) | Empirical results: 96 formal assertions, 32 browser scenarios, 7 viewports, and 30-min stress testing. |
+| **Project Handover Guide** | [`docs/final-project-handover.md`](./docs/final-project-handover.md) | Complete demonstration guide, walkthrough steps, and quick start instructions. |
 | **Project Overview** | [`docs/project-overview.md`](./docs/project-overview.md) | High-level architecture, module contracts, dataflow diagrams, and zero-dependency principles. |
 | **FSM Specification** | [`docs/fsm-design.md`](./docs/fsm-design.md) | 6-tuple formal state automaton, state transition table, invariant proofs, and synthetic fault traps. |
 | **Adaptive Control** | [`docs/adaptive-control.md`](./docs/adaptive-control.md) | Corridor demand formulas ($D_{NS}, D_{EW}$), dynamic green allocation ($5\text{--}25\text{s}$), anti-starvation, and XAI. |

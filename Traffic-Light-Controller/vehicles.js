@@ -225,6 +225,14 @@
       };
     }
 
+    get vehicles() {
+      return this.lanes;
+    }
+
+    getActiveVehicleCount() {
+      return Object.values(this.lanes).reduce((sum, lane) => sum + lane.length, 0);
+    }
+
     /**
      * Set Traffic Density Mode (LOW, MEDIUM, HIGH)
      */
